@@ -97,6 +97,15 @@ public class FinancialEngineService : IFinancialEngineService
         var caixinhaMonthlyYield = Math.Round(profile.NubankCaixinhaBalance * caixinhaMonthlyRate, 2);
         var caixinhaDailyYield = Math.Round(caixinhaMonthlyYield / 30m, 2);
 
+        // Spending Pace calculation
+        var (cycleStart, cycleEnd) = BillingCycleCalculator.GetCyclePeriod(targetCycle, profile.ClosingDay);
+        var totalDaysInCycle = Math.Max(1, (cycleEnd - cycleStart).Days);
+        var daysElapsed = Math.Clamp((DateTime.Now.Date - cycleStart.Date).Days, 0, totalDaysInCycle);
+        var idealDailyBudget = totalDaysInCycle > 0 ? (cardHardCap / totalDaysInCycle) : 0m;
+        var idealPaceAmount = Math.Round(idealDailyBudget * daysElapsed, 2);
+        var paceDiff = currentInvoiceTotal - idealPaceAmount;
+        var paceStatus = paceDiff < -50m ? "AHEAD" : (paceDiff > 50m ? "OVERPACED" : "ON_TRACK");
+
         // Category breakdown
         var categoryGroups = expenses
             .GroupBy(e => string.IsNullOrWhiteSpace(e.Category) ? "Outros" : e.Category)
@@ -140,6 +149,12 @@ public class FinancialEngineService : IFinancialEngineService
             NubankCaixinhaEffectiveAnnualRate = caixinhaEffectiveAnnual,
             NubankCaixinhaMonthlyYield = caixinhaMonthlyYield,
             NubankCaixinhaDailyYield = caixinhaDailyYield,
+
+            DaysElapsed = daysElapsed,
+            TotalDaysInCycle = totalDaysInCycle,
+            IdealPaceAmount = idealPaceAmount,
+            PaceStatus = paceStatus,
+            PaceDifference = paceDiff,
 
             CategoryBreakdown = categoryGroups
         };

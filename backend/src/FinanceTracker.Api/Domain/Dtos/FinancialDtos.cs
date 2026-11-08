@@ -66,6 +66,13 @@ public class DashboardSummaryDto
     public decimal NubankCaixinhaMonthlyYield { get; set; }
     public decimal NubankCaixinhaDailyYield { get; set; }
 
+    // Spending Pace Tracker
+    public int DaysElapsed { get; set; }
+    public int TotalDaysInCycle { get; set; }
+    public decimal IdealPaceAmount { get; set; }
+    public string PaceStatus { get; set; } = "ON_TRACK"; // "AHEAD", "ON_TRACK", "OVERPACED"
+    public decimal PaceDifference { get; set; }
+
     public List<CategoryBreakdownDto> CategoryBreakdown { get; set; } = new();
 }
 

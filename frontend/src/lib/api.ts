@@ -41,6 +41,13 @@ export interface DashboardSummary {
   nubankCaixinhaMonthlyYield: number;
   nubankCaixinhaDailyYield: number;
 
+  // Pace Tracker
+  daysElapsed: number;
+  totalDaysInCycle: number;
+  idealPaceAmount: number;
+  paceStatus: 'AHEAD' | 'ON_TRACK' | 'OVERPACED';
+  paceDifference: number;
+
   categoryBreakdown: CategoryBreakdown[];
 }
 
