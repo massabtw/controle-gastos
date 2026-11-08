@@ -104,17 +104,99 @@ public class CommandProcessorService : ICommandProcessorService
                     ? $"\n💸 Pix Caixinha no Ciclo: R$ {dashboard.PixCaixinhaUsedInCycle.ToString("N2", PtBrCulture)}"
                     : "";
 
+                var subsInfo = dashboard.CardSubscriptionsTotal > 0
+                    ? $"\n🔄 Assinaturas Cartão: R$ {dashboard.CardSubscriptionsTotal.ToString("N2", PtBrCulture)}/mês"
+                    : "";
+
+                var invoiceStatus = dashboard.IsInvoicePaid
+                    ? $"\n✅ Fatura PAGA em {dashboard.InvoicePaidAt:dd/MM} (R$ {dashboard.InvoicePaidAmount:N2})"
+                    : $"\n⏳ Fatura Aberta/Pendente (Vence {dashboard.CycleDueDate:dd/MM})";
+
+                var surplusInfo = dashboard.IsInvoicePaid && dashboard.SecondTrancheSurplus > 0
+                    ? $"\n💰 Sobra da 2ª Parcela (R$ {dashboard.SecondTrancheAmount:N0}): R$ {dashboard.SecondTrancheSurplus:N2} {(dashboard.IsSurplusInvested ? "(Já investida 🐷)" : "- mande 'investir sobra'")}"
+                    : "";
+
                 var reply = $"📊 Ciclo {dashboard.BillingCycle} (Fecha {dashboard.CycleClosingDate:dd/MM} • Vence {dashboard.CycleDueDate:dd/MM})\n" +
                             $"💳 Fatura Cartão: R$ {dashboard.CurrentInvoiceTotal.ToString("N2", PtBrCulture)} / R$ {dashboard.CardHardCap.ToString("N2", PtBrCulture)}" +
-                            pixCaixinhaInfo + "\n" +
+                            invoiceStatus +
+                            surplusInfo +
+                            pixCaixinhaInfo +
+                            subsInfo + "\n" +
                             $"🟢 Saldo no Teto: R$ {dashboard.RemainingBudget.ToString("N2", PtBrCulture)}\n" +
                             $"🔥 Limite Diário: R$ {dashboard.AvailablePerDay.ToString("N2", PtBrCulture)}/dia ({dashboard.DaysUntilClosing}d restantes)\n" +
-                            $"🐷 Caixinha (115% CDI): R$ {dashboard.NubankCaixinhaBalance.ToString("N2", PtBrCulture)}\n" +
+                            $"🏦 Limite Banco Livre: R$ {dashboard.AvailableBankCreditLimit.ToString("N2", PtBrCulture)} de R$ {dashboard.CreditCardLimit.ToString("N2", PtBrCulture)}\n" +
+                            $"🐷 Caixinha (115% CDI): R$ {dashboard.NubankCaixinhaBalance.ToString("N2", PtBrCulture)} (+R$ {dashboard.NubankCaixinhaMonthlyYield:N2}/mês)\n" +
                             $"🛡️ Meta R$ {dashboard.MonthlyInvestmentGoal.ToString("N2", PtBrCulture)}: Intocada";
 
                 return new ChatCommandResponseDto
                 {
                     Intent = "STATUS",
+                    Reply = reply,
+                    Dashboard = dashboard
+                };
+            }
+
+            case "PAY_INVOICE":
+            {
+                var currentCycle = Domain.Services.BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now);
+                var summary = await _financialEngineService.GetDashboardSummaryAsync(currentCycle);
+                var profile = await _profileRepository.GetProfileAsync();
+
+                var (isPaid, paidAmount, surplusAmount, surplusInvested, paidAt) =
+                    await _profileRepository.ToggleInvoicePaymentAsync(
+                        currentCycle,
+                        summary.CurrentInvoiceTotal,
+                        profile.IncomeSecondTranche
+                    );
+
+                var dashboard = await _financialEngineService.GetDashboardSummaryAsync(currentCycle);
+
+                string reply;
+                if (isPaid)
+                {
+                    var surplusMsg = surplusAmount > 0
+                        ? $"\n💰 Sobra da 2ª Parcela (R$ {profile.IncomeSecondTranche:N0}): R$ {surplusAmount.ToString("N2", PtBrCulture)}\n💡 Para aplicar essa sobra na Caixinha (115% CDI), mande: 'investir sobra'!"
+                        : "";
+
+                    reply = $"✅ Fatura do ciclo {currentCycle} marcada como PAGA!\n" +
+                            $"💳 Total quitado: R$ {paidAmount.ToString("N2", PtBrCulture)}\n" +
+                            $"🏦 Limite bancário livre restaurado: R$ {dashboard.AvailableBankCreditLimit.ToString("N2", PtBrCulture)}" +
+                            surplusMsg;
+                }
+                else
+                {
+                    reply = $"↩️ Pagamento da fatura do ciclo {currentCycle} foi desmarcado.";
+                }
+
+                return new ChatCommandResponseDto
+                {
+                    Intent = "PAY_INVOICE",
+                    Reply = reply,
+                    Dashboard = dashboard
+                };
+            }
+
+            case "INVEST_SURPLUS":
+            {
+                var currentCycle = Domain.Services.BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now);
+                var (success, investedAmount, newBalance) = await _profileRepository.InvestInvoiceSurplusAsync(currentCycle);
+                var dashboard = await _financialEngineService.GetDashboardSummaryAsync(currentCycle);
+
+                string reply;
+                if (success)
+                {
+                    reply = $"🎉 Sobra de R$ {investedAmount.ToString("N2", PtBrCulture)} aplicada com sucesso na Caixinha!\n" +
+                            $"🐷 Novo saldo na Caixinha (115% CDI): R$ {newBalance.ToString("N2", PtBrCulture)}\n" +
+                            $"📈 Rendimento mensal estimado: +R$ {dashboard.NubankCaixinhaMonthlyYield.ToString("N2", PtBrCulture)}/mês";
+                }
+                else
+                {
+                    reply = "ℹ️ Não há sobra pendente de investimento nesta fatura (ou a fatura ainda não foi marcada como paga).";
+                }
+
+                return new ChatCommandResponseDto
+                {
+                    Intent = "INVEST_SURPLUS",
                     Reply = reply,
                     Dashboard = dashboard
                 };

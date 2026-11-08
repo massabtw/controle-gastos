@@ -100,6 +100,7 @@ export default function Home() {
           onOpenUpdateCaixinha={() => setIsUpdateCaixinhaOpen(true)}
           onOpenEditCardLimit={() => setIsEditCardLimitOpen(true)}
           onCommitmentPaid={loadData}
+          onInvoiceStatusChanged={loadData}
         />
 
         {/* Lack of Judgment Simulator */}

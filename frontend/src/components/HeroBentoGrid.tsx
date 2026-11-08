@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap, PiggyBank, Edit3, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap, PiggyBank, Edit3, RefreshCw, CheckCircle2, CreditCard } from 'lucide-react';
 import { api, DashboardSummary } from '@/lib/api';
 
 interface HeroBentoGridProps {
@@ -10,6 +10,7 @@ interface HeroBentoGridProps {
   onOpenUpdateCaixinha?: () => void;
   onOpenEditCardLimit?: () => void;
   onCommitmentPaid?: () => void;
+  onInvoiceStatusChanged?: () => void;
 }
 
 export function HeroBentoGrid({
@@ -17,10 +18,40 @@ export function HeroBentoGrid({
   onOpenUpdateCaixinha,
   onOpenEditCardLimit,
   onCommitmentPaid,
+  onInvoiceStatusChanged,
 }: HeroBentoGridProps) {
   const [payingId, setPayingId] = useState<number | null>(null);
+  const [togglingInvoice, setTogglingInvoice] = useState(false);
+  const [investingSurplus, setInvestingSurplus] = useState(false);
 
   if (!summary) return null;
+
+  const handleToggleInvoicePaid = async () => {
+    setTogglingInvoice(true);
+    try {
+      await api.toggleInvoicePaid(summary.billingCycle);
+      onInvoiceStatusChanged?.();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao alterar status da fatura';
+      alert(`Erro: ${message}`);
+    } finally {
+      setTogglingInvoice(false);
+    }
+  };
+
+  const handleInvestSurplus = async () => {
+    setInvestingSurplus(true);
+    try {
+      const res = await api.investInvoiceSurplus(summary.billingCycle);
+      alert(res.message);
+      onInvoiceStatusChanged?.();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao investir sobra';
+      alert(`Erro: ${message}`);
+    } finally {
+      setInvestingSurplus(false);
+    }
+  };
 
   const handleToggleCommitmentPaid = async (commitmentId: number) => {
     setPayingId(commitmentId);
@@ -288,6 +319,87 @@ export function HeroBentoGrid({
                 <span className="font-bold">
                   R$ {summary.cardSubscriptionsTotal.toFixed(2)} / mês
                 </span>
+              </div>
+            )}
+
+            {/* Status da Fatura do Ciclo & 2ª Parcela do Salário (Dia 14) */}
+            {summary.isInvoicePaid ? (
+              <div className="mt-3 p-3.5 rounded-2xl bg-emerald-950/25 border border-emerald-500/40 text-xs font-mono space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Fatura Paga! ✅
+                  </span>
+                  <button
+                    onClick={handleToggleInvoicePaid}
+                    disabled={togglingInvoice}
+                    className="text-[10px] text-zinc-400 hover:text-rose-400 underline cursor-pointer transition-colors"
+                    title="Desfazer marcação de fatura paga"
+                  >
+                    {togglingInvoice ? '...' : 'Desfazer'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-zinc-300 text-[11px]">
+                  <span>Fatura Quitada:</span>
+                  <span className="font-bold text-zinc-100 font-mono">
+                    R$ {summary.invoicePaidAmount.toFixed(2)}
+                  </span>
+                </div>
+                {/* 2nd Tranche Salary Surplus */}
+                <div className="pt-2 border-t border-emerald-500/20 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-zinc-400 block text-[10px]">Sobra do Salário (Dia 14):</span>
+                    <span className="text-emerald-300 font-bold text-sm">
+                      R$ {summary.secondTrancheSurplus.toFixed(2)}
+                    </span>
+                  </div>
+                  {summary.secondTrancheSurplus > 0 && (
+                    summary.isSurplusInvested ? (
+                      <span className="text-[10px] text-purple-300 bg-purple-500/20 px-2 py-1 rounded-lg border border-purple-500/30 flex items-center gap-1 font-semibold">
+                        <PiggyBank className="w-3 h-3" />
+                        Investido na Caixinha
+                      </span>
+                    ) : (
+                      <button
+                        onClick={handleInvestSurplus}
+                        disabled={investingSurplus}
+                        className="text-[11px] font-bold text-purple-200 bg-purple-600 hover:bg-purple-500 px-2.5 py-1.5 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Reinvestir sobra a 115% do CDI na Caixinha Nubank"
+                      >
+                        <PiggyBank className="w-3.5 h-3.5" />
+                        <span>{investingSurplus ? 'Investindo...' : '+ Investir na Caixinha'}</span>
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800 text-xs font-mono space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-zinc-300">
+                    <CreditCard className="w-4 h-4 text-amber-400" />
+                    <span>Fatura (Vence {new Date(summary.cycleDueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
+                  </div>
+                  <button
+                    onClick={handleToggleInvoicePaid}
+                    disabled={togglingInvoice}
+                    className="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md flex items-center gap-1 cursor-pointer"
+                    title="Liquidar fatura com a 2ª parcela do salário (R$ 1.000)"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{togglingInvoice ? 'Processando...' : 'Marcar Paga 💳'}</span>
+                  </button>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-zinc-800/80">
+                  <span>Previsão Salário Dia 14:</span>
+                  <span>R$ {summary.secondTrancheAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-zinc-300">
+                  <span>Sobra estimada p/ reinvestir:</span>
+                  <span className="text-emerald-400 font-bold">
+                    R$ {Math.max(0, summary.secondTrancheAmount - summary.currentInvoiceTotal).toFixed(2)}
+                  </span>
+                </div>
               </div>
             )}
           </div>

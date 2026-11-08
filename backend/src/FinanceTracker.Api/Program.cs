@@ -80,6 +80,20 @@ try
         IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FixedCommitments') AND name = 'LastPaidCycle')
             ALTER TABLE dbo.FixedCommitments ADD LastPaidCycle CHAR(7) NULL;
 
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = N'InvoicePayments' AND type = 'U')
+        BEGIN
+            CREATE TABLE dbo.InvoicePayments (
+                Id INT PRIMARY KEY IDENTITY(1,1),
+                BillingCycle CHAR(7) NOT NULL UNIQUE,
+                IsPaid BIT NOT NULL DEFAULT 1,
+                PaidAmount DECIMAL(10,2) NOT NULL DEFAULT 0,
+                PaidAt DATETIME2 NOT NULL DEFAULT GETDATE(),
+                SurplusAmount DECIMAL(10,2) NOT NULL DEFAULT 0,
+                SurplusInvested BIT NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IX_InvoicePayments_BillingCycle ON dbo.InvoicePayments(BillingCycle);
+        END
+
         UPDATE dbo.FixedCommitments SET Title = N'Internet Móvel Mãe' WHERE Title LIKE '%Internet%';
         UPDATE dbo.FixedCommitments SET Title = N'Monitor Mãe' WHERE Title LIKE '%Monitor%';
         UPDATE dbo.FixedCommitments SET CommitmentType = 'PIX_COMMITMENT', PaymentSource = 'PIX_CAIXINHA' WHERE CommitmentType IS NULL OR CommitmentType = '';

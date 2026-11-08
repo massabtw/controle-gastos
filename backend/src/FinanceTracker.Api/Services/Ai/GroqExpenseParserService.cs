@@ -56,7 +56,7 @@ public class GroqExpenseParserService : IGroqExpenseParserService
         {
             var systemPrompt = @"Você é um assistente financeiro especialista em interpretar comandos e despesas em português brasileiro informal.
 Sua tarefa é analisar a mensagem do usuário e retornar EXCLUSIVAMENTE um JSON com os seguintes campos:
-- intent: 'ADD_EXPENSE' (para compras/gastos), 'SYNC_INVOICE' (ajustar fatura atual), 'UPDATE_CAIXINHA' (atualizar saldo da Caixinha), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
+- intent: 'ADD_EXPENSE' (para compras/gastos), 'PAY_INVOICE' (para 'paguei a fatura', 'fatura paga', 'quitar fatura'), 'INVEST_SURPLUS' (para 'investir sobra', 'guardar sobra'), 'SYNC_INVOICE' (ajustar fatura atual), 'UPDATE_CAIXINHA' (atualizar saldo da Caixinha), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
 - description: Título limpo e capitalizado do gasto ou comando (ex: 'Uber', 'Almoço no Shopping', 'Barbearia', 'Lanche', 'Pix Caixinha', 'Ajuste de Fatura', 'Saldo Caixinha').
 - amount: Valor numérico em reais (ex: 25.00, 150.50, 350.0, 4500.0).
 - installments: Quantidade de parcelas (inteiro, padrão 1 se for à vista).

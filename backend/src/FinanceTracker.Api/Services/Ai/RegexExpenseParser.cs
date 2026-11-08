@@ -28,6 +28,18 @@ public static class RegexExpenseParser
             return new ParsedExpenseIntent { Intent = "UNDO" };
         }
 
+        // 2.1 Pay Invoice command
+        if (text == "paguei a fatura" || text == "fatura paga" || text == "/pagarfatura" || text == "pagar fatura" || text == "quitei a fatura" || text == "quitei o cartao")
+        {
+            return new ParsedExpenseIntent { Intent = "PAY_INVOICE" };
+        }
+
+        // 2.2 Invest Surplus command
+        if (text == "investir sobra" || text == "reinvestir sobra" || text == "guardar sobra" || text == "/investirsobra" || text == "aplicar sobra" || text.Contains("investir a sobra"))
+        {
+            return new ParsedExpenseIntent { Intent = "INVEST_SURPLUS" };
+        }
+
         // 3. Sync Invoice command: "fatura atual 350", "ajustar fatura 350", "fatura 400"
         var syncMatch = Regex.Match(text, @"^(?:ajustar\s+fatura|sincronizar\s+fatura|fatura\s+atual|fatura)\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)$", RegexOptions.IgnoreCase);
         if (syncMatch.Success && decimal.TryParse(syncMatch.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var syncAmount) && syncAmount >= 0)

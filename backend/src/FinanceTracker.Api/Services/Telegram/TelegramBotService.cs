@@ -68,6 +68,8 @@ public class TelegramBotService : ITelegramBotService
                               "• Gasto Cartão: 'uber 25', 'almoço 34,90', 'teclado 300 3x'\n" +
                               "• Pix Caixinha: 'pix 40 corte', 'paguei 25 no pix lanche'\n" +
                               "• Ajustar Fatura: 'fatura atual 350'\n" +
+                              "• Liquidar Fatura: 'paguei a fatura' ou '/pagarfatura'\n" +
+                              "• Reinvestir Sobra: 'investir sobra'\n" +
                               "• Atualizar Caixinha: 'saldo caixinha 4500'\n" +
                               "• Simulação: '/simular 300 3x' ou 'simular 300 em 3x'\n" +
                               "• Resumo do Ciclo: '/status' ou 'como ta minha fatura'\n" +

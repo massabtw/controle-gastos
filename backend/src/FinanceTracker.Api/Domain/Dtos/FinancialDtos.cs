@@ -89,6 +89,14 @@ public class DashboardSummaryDto
     public string PaceStatus { get; set; } = "ON_TRACK"; // "AHEAD", "ON_TRACK", "OVERPACED"
     public decimal PaceDifference { get; set; }
 
+    // Invoice Paid & 2nd Tranche Salary Status
+    public bool IsInvoicePaid { get; set; } = false;
+    public DateTime? InvoicePaidAt { get; set; }
+    public decimal InvoicePaidAmount { get; set; }
+    public decimal SecondTrancheAmount { get; set; } = 1000.00m;
+    public decimal SecondTrancheSurplus { get; set; }
+    public bool IsSurplusInvested { get; set; } = false;
+
     public List<CategoryBreakdownDto> CategoryBreakdown { get; set; } = new();
 }
 

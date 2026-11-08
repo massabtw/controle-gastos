@@ -15,4 +15,7 @@ public interface IProfileRepository
     Task<int> AddFixedCommitmentAsync(FixedCommitment commitment);
     Task<bool> UpdateFixedCommitmentAsync(FixedCommitment commitment);
     Task<bool> DeleteFixedCommitmentAsync(int id);
+    Task<InvoicePayment?> GetInvoicePaymentAsync(string cycle);
+    Task<(bool isPaid, decimal paidAmount, decimal surplusAmount, bool surplusInvested, DateTime? paidAt)> ToggleInvoicePaymentAsync(string cycle, decimal currentInvoiceTotal, decimal secondTrancheSalary);
+    Task<(bool success, decimal surplusInvestedAmount, decimal newCaixinhaBalance)> InvestInvoiceSurplusAsync(string cycle);
 }

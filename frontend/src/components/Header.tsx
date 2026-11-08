@@ -78,24 +78,28 @@ export function Header({
             <span className="font-semibold text-sm sm:text-base text-zinc-100 tracking-wide font-mono">
               Ciclo {selectedCycle}
             </span>
-            {summary?.cycleState === 'CURRENT' && (
+            {summary?.isInvoicePaid ? (
+              <span className="text-[10px] font-semibold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded-md">
+                Paga ✅
+              </span>
+            ) : summary?.cycleState === 'CURRENT' ? (
               <span className="text-[10px] font-semibold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.2 rounded-md">
                 Aberto
               </span>
-            )}
-            {summary?.cycleState === 'CLOSED' && (
+            ) : summary?.cycleState === 'CLOSED' ? (
               <span className="text-[10px] font-semibold uppercase bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.2 rounded-md">
                 Fechado
               </span>
-            )}
-            {summary?.cycleState === 'FUTURE' && (
+            ) : (
               <span className="text-[10px] font-semibold uppercase bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-1.5 py-0.2 rounded-md">
                 Projeção
               </span>
             )}
           </div>
           <span className="text-[11px] text-zinc-400 font-sans">
-            Fecha dia 08 • Vence dia 16
+            {summary?.isInvoicePaid && summary.invoicePaidAt
+              ? `Quitada em ${new Date(summary.invoicePaidAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} • Venceu/Vence dia 16`
+              : 'Fecha dia 08 • Vence dia 16'}
           </span>
         </div>
 

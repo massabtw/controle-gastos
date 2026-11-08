@@ -60,6 +60,14 @@ export interface DashboardSummary {
   paceStatus: 'AHEAD' | 'ON_TRACK' | 'OVERPACED';
   paceDifference: number;
 
+  // Invoice Payment & 2nd Tranche Salary
+  isInvoicePaid: boolean;
+  invoicePaidAt?: string | null;
+  invoicePaidAmount: number;
+  secondTrancheAmount: number;
+  secondTrancheSurplus: number;
+  isSurplusInvested: boolean;
+
   categoryBreakdown: CategoryBreakdown[];
 }
 
@@ -245,6 +253,30 @@ export const api = {
     request<{ message: string; balance: number }>(`/api/profile/caixinha`, {
       method: 'POST',
       body: JSON.stringify({ balance }),
+    }),
+
+  // Invoice Payment (2nd Tranche Salary Sync)
+  toggleInvoicePaid: (cycle: string) =>
+    request<{
+      message: string;
+      cycle: string;
+      isPaid: boolean;
+      paidAmount: number;
+      surplusAmount: number;
+      surplusInvested: boolean;
+      paidAt?: string;
+    }>(`/api/invoices/${cycle}/toggle-paid`, {
+      method: 'POST',
+    }),
+
+  investInvoiceSurplus: (cycle: string) =>
+    request<{
+      message: string;
+      cycle: string;
+      investedAmount: number;
+      newCaixinhaBalance: number;
+    }>(`/api/invoices/${cycle}/invest-surplus`, {
+      method: 'POST',
     }),
 
   // Simulator

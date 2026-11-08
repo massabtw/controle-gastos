@@ -222,4 +222,115 @@ public class ProfileRepository : IProfileRepository
         var affected = await connection.ExecuteAsync(sql, new { Id = id });
         return affected > 0;
     }
+
+    public async Task<InvoicePayment?> GetInvoicePaymentAsync(string cycle)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT Id, BillingCycle, IsPaid, PaidAmount, PaidAt, SurplusAmount, SurplusInvested
+            FROM dbo.InvoicePayments
+            WHERE BillingCycle = @Cycle;";
+
+        return await connection.QueryFirstOrDefaultAsync<InvoicePayment>(sql, new { Cycle = cycle });
+    }
+
+    public async Task<(bool isPaid, decimal paidAmount, decimal surplusAmount, bool surplusInvested, DateTime? paidAt)> ToggleInvoicePaymentAsync(string cycle, decimal currentInvoiceTotal, decimal secondTrancheSalary)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var current = await GetInvoicePaymentAsync(cycle);
+
+        if (current != null && current.IsPaid)
+        {
+            // Unmark: If surplus was invested in Caixinha, deduct it back
+            const string unmarkSql = @"
+                BEGIN TRANSACTION;
+
+                IF @SurplusInvested = 1 AND @SurplusAmount > 0
+                BEGIN
+                    UPDATE dbo.FinancialProfile
+                    SET NubankCaixinhaBalance = CASE 
+                        WHEN NubankCaixinhaBalance - @SurplusAmount < 0 THEN 0 
+                        ELSE NubankCaixinhaBalance - @SurplusAmount 
+                    END
+                    WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+                END
+
+                UPDATE dbo.InvoicePayments
+                SET IsPaid = 0,
+                    SurplusInvested = 0
+                WHERE BillingCycle = @Cycle;
+
+                COMMIT TRANSACTION;";
+
+            await connection.ExecuteAsync(unmarkSql, new
+            {
+                Cycle = cycle,
+                SurplusInvested = current.SurplusInvested ? 1 : 0,
+                SurplusAmount = current.SurplusAmount
+            });
+
+            return (false, current.PaidAmount, current.SurplusAmount, false, null);
+        }
+        else
+        {
+            // Mark as paid
+            var paidAmount = currentInvoiceTotal;
+            var surplus = Math.Max(0, secondTrancheSalary - paidAmount);
+            var paidAt = DateTime.Now;
+
+            const string markSql = @"
+                MERGE dbo.InvoicePayments AS target
+                USING (SELECT @Cycle AS BillingCycle) AS source
+                ON target.BillingCycle = source.BillingCycle
+                WHEN MATCHED THEN
+                    UPDATE SET IsPaid = 1,
+                               PaidAmount = @PaidAmount,
+                               PaidAt = @PaidAt,
+                               SurplusAmount = @SurplusAmount,
+                               SurplusInvested = 0
+                WHEN NOT MATCHED THEN
+                    INSERT (BillingCycle, IsPaid, PaidAmount, PaidAt, SurplusAmount, SurplusInvested)
+                    VALUES (@Cycle, 1, @PaidAmount, @PaidAt, @SurplusAmount, 0);";
+
+            await connection.ExecuteAsync(markSql, new
+            {
+                Cycle = cycle,
+                PaidAmount = paidAmount,
+                PaidAt = paidAt,
+                SurplusAmount = surplus
+            });
+
+            return (true, paidAmount, surplus, false, paidAt);
+        }
+    }
+
+    public async Task<(bool success, decimal surplusInvestedAmount, decimal newCaixinhaBalance)> InvestInvoiceSurplusAsync(string cycle)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var current = await GetInvoicePaymentAsync(cycle);
+
+        if (current == null || !current.IsPaid || current.SurplusInvested || current.SurplusAmount <= 0)
+        {
+            var profile = await GetProfileAsync();
+            return (false, 0, profile.NubankCaixinhaBalance);
+        }
+
+        const string sql = @"
+            BEGIN TRANSACTION;
+
+            UPDATE dbo.FinancialProfile
+            SET NubankCaixinhaBalance = NubankCaixinhaBalance + @SurplusAmount
+            WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+
+            UPDATE dbo.InvoicePayments
+            SET SurplusInvested = 1
+            WHERE BillingCycle = @Cycle;
+
+            SELECT TOP 1 NubankCaixinhaBalance FROM dbo.FinancialProfile ORDER BY Id ASC;
+
+            COMMIT TRANSACTION;";
+
+        var newBalance = await connection.ExecuteScalarAsync<decimal>(sql, new { Cycle = cycle, SurplusAmount = current.SurplusAmount });
+        return (true, current.SurplusAmount, newBalance);
+    }
 }

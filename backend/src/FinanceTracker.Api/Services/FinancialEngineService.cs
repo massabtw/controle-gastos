@@ -144,10 +144,22 @@ public class FinancialEngineService : IFinancialEngineService
         var paceDiff = currentInvoiceTotal - idealPaceAmount;
         var paceStatus = paceDiff < -50m ? "AHEAD" : (paceDiff > 50m ? "OVERPACED" : "ON_TRACK");
 
+        // Invoice Paid & 2nd Tranche Salary Status
+        var invoicePayment = await _profileRepository.GetInvoicePaymentAsync(targetCycle);
+        var isInvoicePaid = invoicePayment != null && invoicePayment.IsPaid;
+        var invoicePaidAmount = (isInvoicePaid && invoicePayment != null) ? invoicePayment.PaidAmount : 0m;
+        var invoicePaidAt = (isInvoicePaid && invoicePayment != null) ? invoicePayment.PaidAt : (DateTime?)null;
+        var secondTrancheAmount = profile.IncomeSecondTranche;
+        var secondTrancheSurplus = (isInvoicePaid && invoicePayment != null)
+            ? invoicePayment.SurplusAmount 
+            : Math.Max(0, secondTrancheAmount - currentInvoiceTotal);
+        var isSurplusInvested = isInvoicePaid && (invoicePayment?.SurplusInvested ?? false);
+
         // Available Bank Credit Limit
         var bankLimit = profile.CreditCardLimit > 0 ? profile.CreditCardLimit : 2500.00m;
         var allCommittedCardExpenses = await _expenseRepository.GetTotalCommittedCardExpensesFromCycleAsync(targetCycle);
-        var availableBankCreditLimit = Math.Max(0, bankLimit - allCommittedCardExpenses - cardSubscriptionsTotal);
+        var committedToDeduct = isInvoicePaid ? Math.Max(0, allCommittedCardExpenses - currentInvoiceTotal) : allCommittedCardExpenses;
+        var availableBankCreditLimit = Math.Max(0, bankLimit - committedToDeduct - cardSubscriptionsTotal);
 
         // Category breakdown (include subscriptions category)
         var allCardItems = expenses.Select(e => new { e.Category, e.Amount }).ToList();
@@ -213,6 +225,13 @@ public class FinancialEngineService : IFinancialEngineService
             IdealPaceAmount = idealPaceAmount,
             PaceStatus = paceStatus,
             PaceDifference = paceDiff,
+
+            IsInvoicePaid = isInvoicePaid,
+            InvoicePaidAt = invoicePaidAt,
+            InvoicePaidAmount = invoicePaidAmount,
+            SecondTrancheAmount = secondTrancheAmount,
+            SecondTrancheSurplus = secondTrancheSurplus,
+            IsSurplusInvested = isSurplusInvested,
 
             CategoryBreakdown = categoryGroups
         };

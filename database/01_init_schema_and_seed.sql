@@ -74,7 +74,24 @@ BEGIN
 END
 GO
 
--- 4. Initial Seed Data
+-- 4. Table: InvoicePayments
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = N'InvoicePayments' AND type = 'U')
+BEGIN
+    CREATE TABLE [dbo].[InvoicePayments] (
+        [Id] INT PRIMARY KEY IDENTITY(1,1),
+        [BillingCycle] CHAR(7) NOT NULL UNIQUE,
+        [IsPaid] BIT NOT NULL DEFAULT 1,
+        [PaidAmount] DECIMAL(10,2) NOT NULL DEFAULT 0,
+        [PaidAt] DATETIME2 NOT NULL DEFAULT GETDATE(),
+        [SurplusAmount] DECIMAL(10,2) NOT NULL DEFAULT 0,
+        [SurplusInvested] BIT NOT NULL DEFAULT 0
+    );
+
+    CREATE INDEX IX_InvoicePayments_BillingCycle ON [dbo].[InvoicePayments]([BillingCycle]);
+END
+GO
+
+-- 5. Initial Seed Data
 IF NOT EXISTS (SELECT 1 FROM [dbo].[FinancialProfile])
 BEGIN
     INSERT INTO [dbo].[FinancialProfile] 
