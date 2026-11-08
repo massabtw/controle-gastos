@@ -3,6 +3,8 @@ bin/
 obj/
 *.user
 *.suo
+appsettings.Development.json
+appsettings.*.local.json
 
 # Node
 node_modules/

@@ -59,31 +59,52 @@ public class TelegramBotService : ITelegramBotService
                 return;
             }
 
-            var result = await _commandProcessor.ProcessCommandAsync(text);
-
-            var botToken = _configuration["Telegram:BotToken"];
-            if (!string.IsNullOrWhiteSpace(botToken))
+            // Handle /start command
+            if (text.Trim().Equals("/start", StringComparison.OrdinalIgnoreCase))
             {
-                var payload = new
-                {
-                    chat_id = chatId,
-                    text = result.Reply
-                };
+                var welcome = "👋 Olá! Sou o seu assistente financeiro do BurnTracker.\n" +
+                              "Aqui você controla seus gastos do cartão e saídas da caixinha em tempo real!\n\n" +
+                              "Comandos e exemplos que você pode mandar:\n" +
+                              "• Gasto Cartão: 'uber 25', 'almoço 34,90', 'teclado 300 3x'\n" +
+                              "• Pix Caixinha: 'pix 40 corte', 'paguei 25 no pix lanche'\n" +
+                              "• Ajustar Fatura: 'fatura atual 350'\n" +
+                              "• Atualizar Caixinha: 'saldo caixinha 4500'\n" +
+                              "• Simulação: '/simular 300 3x' ou 'simular 300 em 3x'\n" +
+                              "• Resumo do Ciclo: '/status' ou 'como ta minha fatura'\n" +
+                              "• Desfazer Último: '/desfazer' ou 'apagar ultimo'";
 
-                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-                var sendUrl = $"https://api.telegram.org/bot{botToken}/sendMessage";
-                var response = await _httpClient.PostAsync(sendUrl, content);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var err = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("Failed to send message to Telegram API: {Error}", err);
-                }
+                await SendTelegramMessageAsync(chatId, welcome);
+                return;
             }
+
+            var result = await _commandProcessor.ProcessCommandAsync(text);
+            await SendTelegramMessageAsync(chatId, result.Reply);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing Telegram update");
+        }
+    }
+
+    private async Task SendTelegramMessageAsync(long chatId, string text)
+    {
+        var botToken = _configuration["Telegram:BotToken"];
+        if (string.IsNullOrWhiteSpace(botToken)) return;
+
+        var payload = new
+        {
+            chat_id = chatId,
+            text = text
+        };
+
+        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        var sendUrl = $"https://api.telegram.org/bot{botToken}/sendMessage";
+        var response = await _httpClient.PostAsync(sendUrl, content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var err = await response.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to send message to Telegram API: {Error}", err);
         }
     }
 }

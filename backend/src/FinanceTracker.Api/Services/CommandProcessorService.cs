@@ -1,5 +1,6 @@
 using System.Globalization;
 using FinanceTracker.Api.Domain.Dtos;
+using FinanceTracker.Api.Infrastructure.Repositories;
 using FinanceTracker.Api.Services.Ai;
 
 namespace FinanceTracker.Api.Services;
@@ -14,16 +15,19 @@ public class CommandProcessorService : ICommandProcessorService
     private readonly IGroqExpenseParserService _parserService;
     private readonly IExpenseService _expenseService;
     private readonly IFinancialEngineService _financialEngineService;
+    private readonly IProfileRepository _profileRepository;
     private static readonly CultureInfo PtBrCulture = new("pt-BR");
 
     public CommandProcessorService(
         IGroqExpenseParserService parserService,
         IExpenseService expenseService,
-        IFinancialEngineService financialEngineService)
+        IFinancialEngineService financialEngineService,
+        IProfileRepository profileRepository)
     {
         _parserService = parserService;
         _expenseService = expenseService;
         _financialEngineService = financialEngineService;
+        _profileRepository = profileRepository;
     }
 
     public async Task<ChatCommandResponseDto> ProcessCommandAsync(string message)
@@ -96,15 +100,54 @@ public class CommandProcessorService : ICommandProcessorService
             case "STATUS":
             {
                 var dashboard = await _financialEngineService.GetDashboardSummaryAsync();
-                var reply = $"📊 Ciclo {dashboard.BillingCycle} (Fecha {dashboard.CycleClosingDate:dd/MM})\n" +
-                            $"💳 Fatura: R$ {dashboard.CurrentInvoiceTotal.ToString("N2", PtBrCulture)} / R$ {dashboard.CardHardCap.ToString("N2", PtBrCulture)}\n" +
+                var pixCaixinhaInfo = dashboard.PixCaixinhaUsedInCycle > 0
+                    ? $"\n💸 Pix Caixinha no Ciclo: R$ {dashboard.PixCaixinhaUsedInCycle.ToString("N2", PtBrCulture)}"
+                    : "";
+
+                var reply = $"📊 Ciclo {dashboard.BillingCycle} (Fecha {dashboard.CycleClosingDate:dd/MM} • Vence {dashboard.CycleDueDate:dd/MM})\n" +
+                            $"💳 Fatura Cartão: R$ {dashboard.CurrentInvoiceTotal.ToString("N2", PtBrCulture)} / R$ {dashboard.CardHardCap.ToString("N2", PtBrCulture)}" +
+                            pixCaixinhaInfo + "\n" +
                             $"🟢 Saldo no Teto: R$ {dashboard.RemainingBudget.ToString("N2", PtBrCulture)}\n" +
-                            $"🔥 Limite Diário: R$ {dashboard.AvailablePerDay.ToString("N2", PtBrCulture)}/dia\n" +
+                            $"🔥 Limite Diário: R$ {dashboard.AvailablePerDay.ToString("N2", PtBrCulture)}/dia ({dashboard.DaysUntilClosing}d restantes)\n" +
+                            $"🐷 Caixinha (115% CDI): R$ {dashboard.NubankCaixinhaBalance.ToString("N2", PtBrCulture)}\n" +
                             $"🛡️ Meta R$ {dashboard.MonthlyInvestmentGoal.ToString("N2", PtBrCulture)}: Intocada";
 
                 return new ChatCommandResponseDto
                 {
                     Intent = "STATUS",
+                    Reply = reply,
+                    Dashboard = dashboard
+                };
+            }
+
+            case "SYNC_INVOICE":
+            {
+                await _expenseService.SyncInvoiceTotalAsync(parsed.Amount);
+                var dashboard = await _financialEngineService.GetDashboardSummaryAsync();
+
+                var reply = $"🔄 Fatura ajustada para R$ {dashboard.CurrentInvoiceTotal.ToString("N2", PtBrCulture)}!\n" +
+                            $"📉 Teto Livre Restante: R$ {dashboard.RemainingBudget.ToString("N2", PtBrCulture)}\n" +
+                            $"🔥 Limite Diário: R$ {dashboard.AvailablePerDay.ToString("N2", PtBrCulture)}/dia ({dashboard.DaysUntilClosing}d restantes)";
+
+                return new ChatCommandResponseDto
+                {
+                    Intent = "SYNC_INVOICE",
+                    Reply = reply,
+                    Dashboard = dashboard
+                };
+            }
+
+            case "UPDATE_CAIXINHA":
+            {
+                await _profileRepository.UpdateCaixinhaBalanceAsync(parsed.Amount);
+                var dashboard = await _financialEngineService.GetDashboardSummaryAsync();
+
+                var reply = $"🐷 Saldo da Caixinha atualizado para R$ {dashboard.NubankCaixinhaBalance.ToString("N2", PtBrCulture)}!\n" +
+                            $"📈 Rendimento estimado (115% CDI): +R$ {dashboard.NubankCaixinhaMonthlyYield.ToString("N2", PtBrCulture)}/mês (+R$ {dashboard.NubankCaixinhaDailyYield.ToString("N2", PtBrCulture)}/dia)";
+
+                return new ChatCommandResponseDto
+                {
+                    Intent = "UPDATE_CAIXINHA",
                     Reply = reply,
                     Dashboard = dashboard
                 };

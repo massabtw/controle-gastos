@@ -34,13 +34,56 @@ public class TelegramPollingBackgroundService : BackgroundService
         }
 
         _logger.LogInformation("Starting Telegram Long Polling service...");
+
+        // 1. Clear any existing webhook so long-polling getUpdates succeeds
+        try
+        {
+            var deleteWebhookUrl = $"https://api.telegram.org/bot{botToken}/deleteWebhook";
+            var deleteResp = await _httpClient.PostAsync(deleteWebhookUrl, null, stoppingToken);
+            _logger.LogInformation("Telegram deleteWebhook called: {Status}", deleteResp.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to call deleteWebhook on Telegram.");
+        }
+
+        // 2. Attempt startup ping to AllowedChatId
+        var allowedChatId = _configuration.GetValue<long>("Telegram:AllowedChatId");
+        if (allowedChatId != 0)
+        {
+            try
+            {
+                var startupMsg = "🚀 FinanceTracker Online! IA Groq + Bot conectados. Mande um gasto (ex: 'uber 25', 'pix 30 corte') ou '/status'.";
+                var payload = new
+                {
+                    chat_id = allowedChatId,
+                    text = startupMsg
+                };
+                var content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+                var sendUrl = $"https://api.telegram.org/bot{botToken}/sendMessage";
+                var resp = await _httpClient.PostAsync(sendUrl, content, stoppingToken);
+                if (resp.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Sent Telegram startup ping to chat {ChatId}", allowedChatId);
+                }
+                else
+                {
+                    _logger.LogInformation("Startup ping not delivered (user may need to press /start first): {Status}", resp.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send startup ping to Telegram.");
+            }
+        }
+
         long offset = 0;
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var url = $"https://api.telegram.org/bot{botToken}/getUpdates?offset={offset}&timeout=20";
+                var url = $"https://api.telegram.org/bot{botToken}/getUpdates?offset={offset}&timeout=25";
                 var response = await _httpClient.GetAsync(url, stoppingToken);
 
                 if (response.IsSuccessStatusCode)

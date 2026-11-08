@@ -103,5 +103,16 @@ public class BillingCycleCalculatorTests
         Assert.Equal("ADD_EXPENSE", result8.Intent);
         Assert.Equal(100.00m, result8.Amount);
         Assert.Equal("PIX_CAIXINHA", result8.PaymentMethod);
+
+        var result9 = RegexExpenseParser.Parse("fatura atual 350");
+        Assert.Equal("SYNC_INVOICE", result9.Intent);
+        Assert.Equal(350.00m, result9.Amount);
+
+        var result10 = RegexExpenseParser.Parse("saldo caixinha 4500");
+        Assert.Equal("UPDATE_CAIXINHA", result10.Intent);
+        Assert.Equal(4500.00m, result10.Amount);
+
+        var result11 = RegexExpenseParser.Parse("como ta minha fatura");
+        Assert.Equal("STATUS", result11.Intent);
     }
 }

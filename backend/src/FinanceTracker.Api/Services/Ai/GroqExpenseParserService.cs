@@ -56,9 +56,9 @@ public class GroqExpenseParserService : IGroqExpenseParserService
         {
             var systemPrompt = @"Você é um assistente financeiro especialista em interpretar comandos e despesas em português brasileiro informal.
 Sua tarefa é analisar a mensagem do usuário e retornar EXCLUSIVAMENTE um JSON com os seguintes campos:
-- intent: 'ADD_EXPENSE' (para compras/gastos), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
-- description: Título limpo e capitalizado do gasto (ex: 'Uber', 'Almoço no Shopping', 'Barbearia', 'Lanche', 'Pix Caixinha').
-- amount: Valor numérico em reais (ex: 25.00, 150.50).
+- intent: 'ADD_EXPENSE' (para compras/gastos), 'SYNC_INVOICE' (ajustar fatura atual), 'UPDATE_CAIXINHA' (atualizar saldo da Caixinha), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
+- description: Título limpo e capitalizado do gasto ou comando (ex: 'Uber', 'Almoço no Shopping', 'Barbearia', 'Lanche', 'Pix Caixinha', 'Ajuste de Fatura', 'Saldo Caixinha').
+- amount: Valor numérico em reais (ex: 25.00, 150.50, 350.0, 4500.0).
 - installments: Quantidade de parcelas (inteiro, padrão 1 se for à vista).
 - category: Escolha exatamente uma entre: 'Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'.
 - paymentMethod: 'PIX_CAIXINHA' se o usuário mencionar 'pix', 'caixinha', 'retirar da caixinha', 'pagar no pix'; caso contrário 'CARD'.
@@ -69,38 +69,55 @@ Exemplos:
 'pix 40 barbearia' -> {'intent': 'ADD_EXPENSE', 'description': 'Barbearia', 'amount': 40.0, 'installments': 1, 'category': 'Saúde', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
 'paguei 25 no pix lanche' -> {'intent': 'ADD_EXPENSE', 'description': 'Lanche', 'amount': 25.0, 'installments': 1, 'category': 'Alimentação', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
 'tirei 100 da caixinha pro pix' -> {'intent': 'ADD_EXPENSE', 'description': 'Pix Caixinha', 'amount': 100.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
+'fatura atual 350' -> {'intent': 'SYNC_INVOICE', 'description': 'Ajuste de Fatura', 'amount': 350.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'CARD', 'transactionDate': null}
+'saldo caixinha 4500' -> {'intent': 'UPDATE_CAIXINHA', 'description': 'Saldo Caixinha', 'amount': 4500.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'CARD', 'transactionDate': null}
 'comprei um jogo 150 em 3x' -> {'intent': 'ADD_EXPENSE', 'description': 'Jogo', 'amount': 150.0, 'installments': 3, 'category': 'Lazer', 'paymentMethod': 'CARD', 'transactionDate': null}
 'simular 400 4x' -> {'intent': 'SIMULATE', 'description': 'Simulação', 'amount': 400.0, 'installments': 4, 'category': 'Compras', 'paymentMethod': 'CARD', 'transactionDate': null}
 '/status' -> {'intent': 'STATUS', 'description': '', 'amount': 0.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'CARD', 'transactionDate': null}
 '/desfazer' -> {'intent': 'UNDO', 'description': '', 'amount': 0.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'CARD', 'transactionDate': null}
 ";
 
-            var requestBody = new
+            var candidateModels = new[] { model, "openai/gpt-oss-120b", "qwen/qwen3.8-27b" }.Distinct();
+            string? responseJson = null;
+
+            foreach (var currentModel in candidateModels)
             {
-                model = model,
-                messages = new object[]
+                var requestBody = new
                 {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = message }
-                },
-                response_format = new { type = "json_object" },
-                temperature = 0.1
-            };
+                    model = currentModel,
+                    messages = new object[]
+                    {
+                        new { role = "system", content = systemPrompt },
+                        new { role = "user", content = message }
+                    },
+                    response_format = new { type = "json_object" },
+                    temperature = 0.1
+                };
 
-            var requestJson = JsonSerializer.Serialize(requestBody);
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            request.Content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                var requestJson = JsonSerializer.Serialize(requestBody);
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                request.Content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
+                var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    responseJson = await response.Content.ReadAsStringAsync();
+                    break;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning("Groq API with model {Model} returned status {StatusCode}: {Error}.", currentModel, response.StatusCode, errorContent);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(responseJson))
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Groq API returned status {StatusCode}: {Error}. Falling back to Regex parser.", response.StatusCode, errorContent);
+                _logger.LogWarning("All Groq models failed. Falling back to deterministic Regex parser.");
                 return RegexExpenseParser.Parse(message);
             }
 
-            var responseJson = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(responseJson);
             var contentString = doc.RootElement
                 .GetProperty("choices")[0]

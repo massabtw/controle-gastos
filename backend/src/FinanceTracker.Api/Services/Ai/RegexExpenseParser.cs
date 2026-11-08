@@ -17,18 +17,42 @@ public static class RegexExpenseParser
         var text = input.Trim().ToLowerInvariant();
 
         // 1. Status command
-        if (text == "status" || text == "/status")
+        if (text == "status" || text == "/status" || text.Contains("como ta minha fatura") || text.Contains("como está minha fatura") || text == "resumo")
         {
             return new ParsedExpenseIntent { Intent = "STATUS" };
         }
 
         // 2. Undo command
-        if (text == "desfazer" || text == "/desfazer" || text == "apagar ultimo" || text == "desfazer ultimo")
+        if (text == "desfazer" || text == "/desfazer" || text == "apagar ultimo" || text == "desfazer ultimo" || text == "apagar último" || text == "desfaz")
         {
             return new ParsedExpenseIntent { Intent = "UNDO" };
         }
 
-        // 3. Simulate command: "simular 400 4x", "/simular 500 em 3x", "simular 150"
+        // 3. Sync Invoice command: "fatura atual 350", "ajustar fatura 350", "fatura 400"
+        var syncMatch = Regex.Match(text, @"^(?:ajustar\s+fatura|sincronizar\s+fatura|fatura\s+atual|fatura)\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)$", RegexOptions.IgnoreCase);
+        if (syncMatch.Success && decimal.TryParse(syncMatch.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var syncAmount) && syncAmount >= 0)
+        {
+            return new ParsedExpenseIntent
+            {
+                Intent = "SYNC_INVOICE",
+                Amount = syncAmount,
+                Description = "Ajuste de Fatura"
+            };
+        }
+
+        // 4. Update Caixinha balance: "saldo caixinha 4500", "atualizar caixinha 5000", "saldo da caixinha 4500"
+        var caixinhaMatch = Regex.Match(text, @"^(?:saldo\s+caixinha|atualizar\s+caixinha|saldo\s+da\s+caixinha|caixinha\s+saldo)\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)$", RegexOptions.IgnoreCase);
+        if (caixinhaMatch.Success && decimal.TryParse(caixinhaMatch.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var caixinhaBalance) && caixinhaBalance >= 0)
+        {
+            return new ParsedExpenseIntent
+            {
+                Intent = "UPDATE_CAIXINHA",
+                Amount = caixinhaBalance,
+                Description = "Saldo Caixinha"
+            };
+        }
+
+        // 5. Simulate command: "simular 400 4x", "/simular 500 em 3x", "simular 150"
         var simMatch = Regex.Match(text, @"^(?:/|)?simular\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(?:em\s+)?([0-9]{1,2})x?)?", RegexOptions.IgnoreCase);
         if (simMatch.Success)
         {
@@ -51,7 +75,7 @@ public static class RegexExpenseParser
             }
         }
 
-        // 4. Relative dates (e.g., "ontem")
+        // 6. Relative dates (e.g., "ontem")
         DateTime? targetDate = null;
         if (text.Contains("ontem"))
         {
@@ -59,7 +83,7 @@ public static class RegexExpenseParser
             text = text.Replace("ontem", "").Trim();
         }
 
-        // 5. Pix / Caixinha check
+        // 7. Pix / Caixinha check
         var isPix = Regex.IsMatch(text, @"\b(pix|caixinha)\b", RegexOptions.IgnoreCase);
         if (isPix)
         {
