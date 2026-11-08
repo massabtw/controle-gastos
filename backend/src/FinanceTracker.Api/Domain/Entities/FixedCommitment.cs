@@ -8,4 +8,9 @@ public class FixedCommitment
     public string StartCycle { get; set; } = string.Empty; // Format: 'YYYY-MM'
     public int? TotalInstallments { get; set; } // null = fixed recurring indefinitely; int = fixed installments
     public bool IsActive { get; set; } = true;
+
+    public string CommitmentType { get; set; } = "PIX_COMMITMENT"; // "PIX_COMMITMENT" or "SUBSCRIPTION"
+    public string PaymentSource { get; set; } = "PIX_CAIXINHA";    // "CARD", "PIX_CAIXINHA", "PIX_ACCOUNT"
+    public int? BillingDay { get; set; } = 1;
+    public string? LastPaidCycle { get; set; }
 }

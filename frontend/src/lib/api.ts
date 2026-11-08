@@ -4,7 +4,12 @@ export interface ActiveCommitment {
   id: number;
   title: string;
   amount: number;
-  badge: string; // e.g. "1/5" or "Fixo"
+  badge: string; // e.g. "1/5" or "Fixo" or "Mensal"
+  commitmentType?: 'PIX_COMMITMENT' | 'SUBSCRIPTION';
+  paymentSource?: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT';
+  billingDay?: number | null;
+  lastPaidCycle?: string | null;
+  isPaidInCycle?: boolean;
 }
 
 export interface CategoryBreakdown {
@@ -22,9 +27,15 @@ export interface DashboardSummary {
   incomeFirstTranche: number;
   incomeSecondTranche: number;
   monthlyInvestmentGoal: number;
+  creditCardLimit: number;
+  customCardCap: number | null;
+  availableBankCreditLimit: number;
   activeFixedCommitments: ActiveCommitment[];
   totalFixedCommitments: number;
+  activeSubscriptions: ActiveCommitment[];
+  cardSubscriptionsTotal: number;
   cardHardCap: number;
+  cardHardCapFormula: number;
   currentInvoiceTotal: number;
   pixCaixinhaUsedInCycle: number;
   remainingBudget: number;
@@ -62,7 +73,7 @@ export interface CardExpense {
   installmentCurrent: number;
   installmentTotal: number;
   purchaseGroupId: string | null;
-  paymentMethod: 'CARD' | 'PIX_CAIXINHA';
+  paymentMethod: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT';
   deductFromCycleCap: boolean;
 }
 
@@ -111,6 +122,8 @@ export interface FinancialProfile {
   cdiAnnualRate: number;
   nubankCaixinhaBalance: number;
   nubankCaixinhaCdiRate: number;
+  creditCardLimit: number;
+  customCardCap: number | null;
   totalIncome: number;
 }
 
@@ -121,6 +134,10 @@ export interface FixedCommitment {
   startCycle: string;
   totalInstallments: number | null;
   isActive: boolean;
+  commitmentType?: 'PIX_COMMITMENT' | 'SUBSCRIPTION';
+  paymentSource?: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT';
+  billingDay?: number | null;
+  lastPaidCycle?: string | null;
 }
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -163,10 +180,23 @@ export const api = {
     totalAmount: number;
     installments: number;
     transactionDate?: string;
+    paymentMethod?: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT';
+    deductFromCycleCap?: boolean;
   }) => request<CardExpense[]>(`/api/expenses`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),
+
+  updateCardLimit: (creditCardLimit: number, customCardCap: number | null) =>
+    request<{ message: string; creditCardLimit: number; customCardCap: number | null }>(`/api/profile/card-limit`, {
+      method: 'PATCH',
+      body: JSON.stringify({ creditCardLimit, customCardCap }),
+    }),
+
+  payCommitmentFromCaixinha: (id: number, cycle?: string) =>
+    request<{ message: string; cycle: string }>(`/api/commitments/${id}/pay-from-caixinha${cycle ? `?cycle=${cycle}` : ''}`, {
+      method: 'POST',
+    }),
 
   createPixCaixinhaExpense: (data: {
     description: string;

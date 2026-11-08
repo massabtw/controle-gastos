@@ -62,8 +62,27 @@ try
     var dbFactory = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
     using var connection = dbFactory.CreateConnection();
     Dapper.SqlMapper.Execute(connection, @"
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'CreditCardLimit')
+            ALTER TABLE dbo.FinancialProfile ADD CreditCardLimit DECIMAL(12,2) NOT NULL DEFAULT 2500.00;
+
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'CustomCardCap')
+            ALTER TABLE dbo.FinancialProfile ADD CustomCardCap DECIMAL(12,2) NULL;
+
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FixedCommitments') AND name = 'CommitmentType')
+            ALTER TABLE dbo.FixedCommitments ADD CommitmentType NVARCHAR(20) NOT NULL DEFAULT 'PIX_COMMITMENT';
+
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FixedCommitments') AND name = 'PaymentSource')
+            ALTER TABLE dbo.FixedCommitments ADD PaymentSource NVARCHAR(20) NOT NULL DEFAULT 'PIX_CAIXINHA';
+
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FixedCommitments') AND name = 'BillingDay')
+            ALTER TABLE dbo.FixedCommitments ADD BillingDay INT NULL DEFAULT 1;
+
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FixedCommitments') AND name = 'LastPaidCycle')
+            ALTER TABLE dbo.FixedCommitments ADD LastPaidCycle CHAR(7) NULL;
+
         UPDATE dbo.FixedCommitments SET Title = N'Internet Móvel Mãe' WHERE Title LIKE '%Internet%';
         UPDATE dbo.FixedCommitments SET Title = N'Monitor Mãe' WHERE Title LIKE '%Monitor%';
+        UPDATE dbo.FixedCommitments SET CommitmentType = 'PIX_COMMITMENT', PaymentSource = 'PIX_CAIXINHA' WHERE CommitmentType IS NULL OR CommitmentType = '';
     ");
 }
 catch (Exception ex)

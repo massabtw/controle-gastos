@@ -2,31 +2,41 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Trash2, Settings2, CreditCard, PiggyBank, Send } from 'lucide-react';
+import { X, Trash2, Settings2, CreditCard, PiggyBank, Send, RefreshCw, Sliders, Plus } from 'lucide-react';
 import { api, CardExpense, FinancialProfile, FixedCommitment } from '@/lib/api';
 
 const CATEGORIES = ['Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'];
 
-// 1. NEW EXPENSE MODAL
+// 1. NEW EXPENSE MODAL (WITH PAYMENT SOURCE SELECTOR)
 interface NewExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  currentCaixinhaBalance?: number;
 }
 
-export function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalProps) {
+export function NewExpenseModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  currentCaixinhaBalance = 0,
+}: NewExpenseModalProps) {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Alimentação');
   const [amount, setAmount] = useState('');
   const [installments, setInstallments] = useState(1);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState<'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT'>('CARD');
+  const [deductFromCycleCap, setDeductFromCycleCap] = useState(true);
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
+  const numAmount = parseFloat(amount.replace(',', '.')) || 0;
+  const balanceAfterPix = Math.max(0, currentCaixinhaBalance - numAmount);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const numAmount = parseFloat(amount.replace(',', '.'));
     if (!description.trim() || isNaN(numAmount) || numAmount <= 0) return;
 
     setLoading(true);
@@ -35,14 +45,18 @@ export function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalP
         description: description.trim(),
         category,
         totalAmount: numAmount,
-        installments: Number(installments),
+        installments: paymentMethod === 'CARD' ? Number(installments) : 1,
         transactionDate: date ? new Date(date).toISOString() : undefined,
+        paymentMethod,
+        deductFromCycleCap: paymentMethod === 'CARD' ? true : deductFromCycleCap,
       });
       onSuccess();
       onClose();
       setDescription('');
       setAmount('');
       setInstallments(1);
+      setPaymentMethod('CARD');
+      setDeductFromCycleCap(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Falha ao salvar';
       alert(`Erro: ${message}`);
@@ -60,13 +74,67 @@ export function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalP
         className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
       >
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
-          <h3 className="text-base font-bold text-zinc-100">Novo Lançamento no Cartão</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-zinc-100">Novo Lançamento</h3>
+            <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
+              paymentMethod === 'CARD' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+              paymentMethod === 'PIX_CAIXINHA' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
+              'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            }`}>
+              {paymentMethod === 'CARD' ? 'Fatura Cartão' : paymentMethod === 'PIX_CAIXINHA' ? 'Pix Caixinha' : 'Pix Saldo Conta'}
+            </span>
+          </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {/* Segmented Payment Source Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+              De onde saiu o dinheiro?
+            </label>
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-zinc-950/80 rounded-2xl border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('CARD')}
+                className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                  paymentMethod === 'CARD'
+                    ? 'bg-emerald-500 text-zinc-950 shadow-md font-bold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <span>💳 Cartão</span>
+                <span className="text-[10px] opacity-80 font-normal">Fatura</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('PIX_CAIXINHA')}
+                className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                  paymentMethod === 'PIX_CAIXINHA'
+                    ? 'bg-cyan-500 text-zinc-950 shadow-md font-bold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <span>🐷 Caixinha</span>
+                <span className="text-[10px] opacity-80 font-normal">Pix 115%</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('PIX_ACCOUNT')}
+                className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                  paymentMethod === 'PIX_ACCOUNT'
+                    ? 'bg-blue-500 text-zinc-950 shadow-md font-bold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <span>🏦 Saldo Conta</span>
+                <span className="text-[10px] opacity-80 font-normal">Pix / Débito</span>
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
               Descrição
@@ -76,7 +144,7 @@ export function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalP
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: Supermercado, Uber, Teclado..."
+              placeholder="Ex: Supermercado, Uber, Barbearia..."
               className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
             />
           </div>
@@ -98,23 +166,65 @@ export function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalP
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
-                Parcelas
-              </label>
-              <select
-                value={installments}
-                onChange={(e) => setInstallments(Number(e.target.value))}
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
-              >
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-                  <option key={n} value={n}>
-                    {n}x {amount && n > 1 ? `(R$ ${(parseFloat(amount) / n || 0).toFixed(2)})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {paymentMethod === 'CARD' ? (
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                  Parcelas
+                </label>
+                <select
+                  value={installments}
+                  onChange={(e) => setInstallments(Number(e.target.value))}
+                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                    <option key={n} value={n}>
+                      {n}x {amount && n > 1 ? `(R$ ${(parseFloat(amount) / n || 0).toFixed(2)})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                  Pagamento
+                </label>
+                <div className="w-full bg-zinc-950/70 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-400 flex items-center gap-1.5 font-medium">
+                  <span>À vista (1x)</span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Contextual notes & balance preview based on Payment Source */}
+          {paymentMethod === 'PIX_CAIXINHA' && (
+            <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-cyan-500/30 text-xs font-mono space-y-1.5">
+              <div className="flex items-center justify-between text-zinc-400">
+                <span>Saldo atual na Caixinha:</span>
+                <span className="text-purple-300 font-bold">R$ {currentCaixinhaBalance.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-200">
+                <span>Saldo após este Pix:</span>
+                <span className={`font-bold ${balanceAfterPix < 0 ? 'text-rose-400' : 'text-cyan-300'}`}>
+                  R$ {balanceAfterPix.toFixed(2)}
+                </span>
+              </div>
+              <label className="flex items-center gap-2 pt-2 border-t border-zinc-800/80 cursor-pointer text-[11px] text-zinc-300 font-sans">
+                <input
+                  type="checkbox"
+                  checked={deductFromCycleCap}
+                  onChange={(e) => setDeductFromCycleCap(e.target.checked)}
+                  className="rounded text-cyan-500 focus:ring-cyan-400 bg-zinc-900 border-zinc-700"
+                />
+                <span>Abater do Teto Livre deste ciclo (proteger meta de R$ 1.000)</span>
+              </label>
+            </div>
+          )}
+
+          {paymentMethod === 'PIX_ACCOUNT' && (
+            <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/30 text-xs text-blue-300 leading-relaxed font-sans">
+              ℹ️ Este valor saiu do saldo em conta corrente. Ele consome seu teto livre mensal para proteger a meta de R$ 1.000, sem subtrair do saldo guardado na Caixinha.
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -158,9 +268,9 @@ export function NewExpenseModal({ isOpen, onClose, onSuccess }: NewExpenseModalP
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-md transition-all cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-md transition-all cursor-pointer"
             >
-              {loading ? 'Salvando...' : 'Salvar Gasto'}
+              {loading ? 'Salvando...' : 'Salvar Lançamento'}
             </button>
           </div>
         </form>
@@ -494,6 +604,9 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
         startCycle: newStartCycle,
         totalInstallments: isFixedIndefinite ? null : Number(newTotalInstallments),
         isActive: true,
+        commitmentType: 'PIX_COMMITMENT',
+        paymentSource: 'PIX_CAIXINHA',
+        billingDay: 1,
       });
       setNewTitle('');
       setNewAmount('');
@@ -674,6 +787,36 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                   value={profile.nubankCaixinhaCdiRate ?? 115}
                   onChange={(e) => setProfile({ ...profile, nubankCaixinhaCdiRate: Number(e.target.value) })}
                   className="w-full bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                />
+              </div>
+            </div>
+
+            {/* Credit Card Bank Limit & Custom Cap */}
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-blue-950/20 border border-blue-500/20">
+              <div>
+                <label className="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">
+                  Limite Total do Banco (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={profile.creditCardLimit ?? 2500}
+                  onChange={(e) => setProfile({ ...profile, creditCardLimit: Number(e.target.value) })}
+                  className="w-full bg-zinc-950/70 border border-blue-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">
+                  Teto Manual (Opcional R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Automático (Fórmula)"
+                  value={profile.customCardCap ?? ''}
+                  onChange={(e) => setProfile({ ...profile, customCardCap: e.target.value ? Number(e.target.value) : null })}
+                  className="w-full bg-zinc-950/70 border border-blue-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
                 />
               </div>
             </div>
@@ -1262,6 +1405,417 @@ export function PixCaixinhaModal({
             >
               <Send className="w-3.5 h-3.5" />
               {loading ? 'Processando...' : 'Confirmar Retirada Pix'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// 8. EDIT CARD LIMIT & CUSTOM CAP MODAL
+interface EditCardLimitModalProps {
+  isOpen: boolean;
+  currentCreditCardLimit: number;
+  currentCustomCardCap: number | null;
+  formulaCap: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function EditCardLimitModal({
+  isOpen,
+  currentCreditCardLimit,
+  currentCustomCardCap,
+  formulaCap,
+  onClose,
+  onSuccess,
+}: EditCardLimitModalProps) {
+  const [bankLimitStr, setBankLimitStr] = useState('');
+  const [isCustomCap, setIsCustomCap] = useState(false);
+  const [customCapStr, setCustomCapStr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setBankLimitStr(currentCreditCardLimit > 0 ? currentCreditCardLimit.toString() : '2500');
+      const hasCustom = currentCustomCardCap !== null && currentCustomCardCap > 0;
+      setIsCustomCap(hasCustom);
+      setCustomCapStr(hasCustom ? currentCustomCardCap!.toString() : formulaCap.toFixed(2));
+    }
+  }, [isOpen, currentCreditCardLimit, currentCustomCardCap, formulaCap]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const bankLimit = parseFloat(bankLimitStr.replace(',', '.'));
+    if (isNaN(bankLimit) || bankLimit <= 0) {
+      alert('Informe um limite de cartão válido.');
+      return;
+    }
+
+    let finalCustomCap: number | null = null;
+    if (isCustomCap) {
+      const parsedCap = parseFloat(customCapStr.replace(',', '.'));
+      if (isNaN(parsedCap) || parsedCap <= 0) {
+        alert('Informe um valor de teto válido.');
+        return;
+      }
+      finalCustomCap = parsedCap;
+    }
+
+    setLoading(true);
+    try {
+      await api.updateCardLimit(bankLimit, finalCustomCap);
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao salvar limites';
+      alert(`Erro: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-100">Limites & Teto do Cartão</h3>
+              <span className="text-[10px] font-mono text-blue-400">Configuração de Teto e Limite Bancário</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {/* 1. Bank Limit */}
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+              Limite Total Concedido pelo Nubank (R$)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                R$
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="1"
+                required
+                value={bankLimitStr}
+                onChange={(e) => setBankLimitStr(e.target.value)}
+                placeholder="2500.00"
+                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 font-mono text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <span className="text-[11px] text-zinc-500 mt-1 block">
+              Usado para calcular seu limite de crédito livre real considerando faturas atuais e parcelas futuras.
+            </span>
+          </div>
+
+          {/* 2. Cap mode toggle */}
+          <div className="pt-2 border-t border-zinc-800/80 space-y-3">
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              Modo do Teto Mensal do Cartão
+            </label>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCustomCap(false)}
+                className={`p-3 rounded-2xl border text-left transition-all ${
+                  !isCustomCap
+                    ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-300 shadow-sm'
+                    : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
+                  <span>⚡ Automático</span>
+                </div>
+                <div className="text-[11px] font-mono text-zinc-300 font-semibold">
+                  R$ {formulaCap.toFixed(2)}
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-0.5 leading-tight">
+                  Regra de Ouro (Renda − Meta − Pix)
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsCustomCap(true)}
+                className={`p-3 rounded-2xl border text-left transition-all ${
+                  isCustomCap
+                    ? 'bg-blue-950/30 border-blue-500/50 text-blue-300 shadow-sm'
+                    : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs mb-1">
+                  <span>✏️ Personalizado</span>
+                </div>
+                <div className="text-[11px] font-mono text-zinc-300 font-semibold">
+                  Manual
+                </div>
+                <div className="text-[10px] text-zinc-500 mt-0.5 leading-tight">
+                  Defina um valor fixo de teto
+                </div>
+              </button>
+            </div>
+
+            {isCustomCap && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="pt-2"
+              >
+                <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                  Valor do Teto Manual (R$)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    required
+                    value={customCapStr}
+                    onChange={(e) => setCustomCapStr(e.target.value)}
+                    placeholder="1030.00"
+                    className="w-full bg-zinc-950/70 border border-blue-500/60 rounded-xl py-2.5 pl-10 pr-4 font-mono text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <span className="text-[11px] text-blue-400 mt-1 block">
+                  Sobrescreve a fórmula automática no cálculo do burn rate e ritmo diário.
+                </span>
+              </motion.div>
+            )}
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+            >
+              {loading ? 'Salvando...' : 'Salvar Limites'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// 9. NEW RECURRING SUBSCRIPTION MODAL
+interface NewSubscriptionModalProps {
+  isOpen: boolean;
+  currentCycle?: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function NewSubscriptionModal({
+  isOpen,
+  currentCycle,
+  onClose,
+  onSuccess,
+}: NewSubscriptionModalProps) {
+  const [title, setTitle] = useState('');
+  const [amountStr, setAmountStr] = useState('');
+  const [billingDay, setBillingDay] = useState(10);
+  const [paymentSource, setPaymentSource] = useState<'CARD' | 'PIX_CAIXINHA'>('CARD');
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(amountStr.replace(',', '.'));
+    if (!title.trim() || isNaN(amount) || amount <= 0) return;
+
+    setLoading(true);
+    try {
+      const cycle = currentCycle || new Date().toISOString().substring(0, 7);
+      await api.addCommitment({
+        title: title.trim(),
+        amount,
+        startCycle: cycle,
+        totalInstallments: null,
+        isActive: true,
+        commitmentType: 'SUBSCRIPTION',
+        paymentSource,
+        billingDay: Number(billingDay),
+      });
+      onSuccess();
+      onClose();
+      setTitle('');
+      setAmountStr('');
+      setBillingDay(10);
+      setPaymentSource('CARD');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao adicionar assinatura';
+      alert(`Erro: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+              <RefreshCw className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-100">Nova Assinatura Fixa</h3>
+              <span className="text-[10px] font-mono text-purple-400">Lançamento Recorrente Mensal</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+              Nome do Serviço
+            </label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex: Google One, Spotify, Netflix, Academia..."
+              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                Valor Mensal (R$)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                  R$
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={amountStr}
+                  onChange={(e) => setAmountStr(e.target.value)}
+                  placeholder="29.90"
+                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-3 font-mono text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+                Dia de Cobrança
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                  Dia
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  required
+                  value={billingDay}
+                  onChange={(e) => setBillingDay(Number(e.target.value))}
+                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-12 pr-3 font-mono text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Source Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
+              Forma de Pagamento Recorrente
+            </label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-950/80 rounded-2xl border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => setPaymentSource('CARD')}
+                className={`py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  paymentSource === 'CARD'
+                    ? 'bg-emerald-500 text-zinc-950 shadow-md font-bold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>💳 Cartão de Crédito</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentSource('PIX_CAIXINHA')}
+                className={`py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  paymentSource === 'PIX_CAIXINHA'
+                    ? 'bg-cyan-500 text-zinc-950 shadow-md font-bold'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <PiggyBank className="w-3.5 h-3.5" />
+                <span>🐷 Pix Caixinha</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-500 mt-1.5 leading-tight">
+              {paymentSource === 'CARD'
+                ? '🔒 Assinaturas no cartão são computadas na fatura do ciclo e projetadas automaticamente para os próximos meses.'
+                : '🐷 Assinaturas debitadas via Pix da Caixinha deduzem do saldo investido.'}
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {loading ? 'Adicionando...' : 'Cadastrar Assinatura'}
             </button>
           </div>
         </form>

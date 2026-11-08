@@ -34,34 +34,71 @@ public class FinancialEngineService : IFinancialEngineService
         var cycleComparison = string.CompareOrdinal(targetCycle, currentActiveCycle);
         var cycleState = cycleComparison < 0 ? "CLOSED" : (cycleComparison > 0 ? "FUTURE" : "CURRENT");
 
-        // Calculate active commitments for this cycle
-        var allCommitments = await _profileRepository.GetFixedCommitmentsAsync(onlyActive: true);
+        // Calculate active commitments and subscriptions for this cycle
+        var allCommitments = (await _profileRepository.GetFixedCommitmentsAsync(onlyActive: true)).ToList();
         var activeCommitmentsList = new List<ActiveCommitmentDto>();
+        var activeSubscriptionsList = new List<ActiveCommitmentDto>();
         decimal totalFixedCommitments = 0m;
+        decimal cardSubscriptionsTotal = 0m;
 
         foreach (var commitment in allCommitments)
         {
-            var badge = BillingCycleCalculator.GetCommitmentInstallmentStatus(commitment, targetCycle);
-            if (badge != null)
+            var isSubscription = string.Equals(commitment.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase);
+            var isPaidInCycle = string.Equals(commitment.LastPaidCycle, targetCycle, StringComparison.OrdinalIgnoreCase);
+
+            if (isSubscription)
             {
-                activeCommitmentsList.Add(new ActiveCommitmentDto
+                activeSubscriptionsList.Add(new ActiveCommitmentDto
                 {
                     Id = commitment.Id,
                     Title = commitment.Title,
                     Amount = commitment.Amount,
-                    Badge = badge
+                    Badge = "Mensal",
+                    CommitmentType = "SUBSCRIPTION",
+                    PaymentSource = string.IsNullOrWhiteSpace(commitment.PaymentSource) ? "CARD" : commitment.PaymentSource,
+                    BillingDay = commitment.BillingDay ?? 1,
+                    LastPaidCycle = commitment.LastPaidCycle,
+                    IsPaidInCycle = isPaidInCycle
                 });
-                totalFixedCommitments += commitment.Amount;
+
+                if (string.Equals(commitment.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase))
+                {
+                    cardSubscriptionsTotal += commitment.Amount;
+                }
+            }
+            else
+            {
+                var badge = BillingCycleCalculator.GetCommitmentInstallmentStatus(commitment, targetCycle);
+                if (badge != null)
+                {
+                    activeCommitmentsList.Add(new ActiveCommitmentDto
+                    {
+                        Id = commitment.Id,
+                        Title = commitment.Title,
+                        Amount = commitment.Amount,
+                        Badge = badge,
+                        CommitmentType = "PIX_COMMITMENT",
+                        PaymentSource = string.IsNullOrWhiteSpace(commitment.PaymentSource) ? "PIX_CAIXINHA" : commitment.PaymentSource,
+                        BillingDay = commitment.BillingDay ?? 1,
+                        LastPaidCycle = commitment.LastPaidCycle,
+                        IsPaidInCycle = isPaidInCycle
+                    });
+                    totalFixedCommitments += commitment.Amount;
+                }
             }
         }
 
         // Hard Cap Formula: TotalIncome - InvestmentGoal - TotalFixedCommitments
         var totalIncome = profile.TotalIncome;
-        var cardHardCap = totalIncome - profile.MonthlyInvestmentGoal - totalFixedCommitments;
+        var formulaHardCap = totalIncome - profile.MonthlyInvestmentGoal - totalFixedCommitments;
+        var cardHardCap = (profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0)
+            ? profile.CustomCardCap.Value
+            : formulaHardCap;
 
         // Expenses in target cycle
         var expenses = (await _expenseRepository.GetExpensesByCycleAsync(targetCycle)).ToList();
-        var currentInvoiceTotal = expenses.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
+        var manualCardExpensesTotal = expenses.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
+        var currentInvoiceTotal = manualCardExpensesTotal + cardSubscriptionsTotal;
         var pixCaixinhaUsedInCycle = expenses.Where(e => e.PaymentMethod == "PIX_CAIXINHA" && e.DeductFromCycleCap).Sum(e => e.Amount);
         var remainingBudget = cardHardCap - currentInvoiceTotal - pixCaixinhaUsedInCycle;
 
@@ -107,8 +144,19 @@ public class FinancialEngineService : IFinancialEngineService
         var paceDiff = currentInvoiceTotal - idealPaceAmount;
         var paceStatus = paceDiff < -50m ? "AHEAD" : (paceDiff > 50m ? "OVERPACED" : "ON_TRACK");
 
-        // Category breakdown
-        var categoryGroups = expenses
+        // Available Bank Credit Limit
+        var bankLimit = profile.CreditCardLimit > 0 ? profile.CreditCardLimit : 2500.00m;
+        var allCommittedCardExpenses = await _expenseRepository.GetTotalCommittedCardExpensesFromCycleAsync(targetCycle);
+        var availableBankCreditLimit = Math.Max(0, bankLimit - allCommittedCardExpenses - cardSubscriptionsTotal);
+
+        // Category breakdown (include subscriptions category)
+        var allCardItems = expenses.Select(e => new { e.Category, e.Amount }).ToList();
+        foreach (var sub in activeSubscriptionsList.Where(s => s.PaymentSource == "CARD"))
+        {
+            allCardItems.Add(new { Category = "Assinaturas", sub.Amount });
+        }
+
+        var categoryGroups = allCardItems
             .GroupBy(e => string.IsNullOrWhiteSpace(e.Category) ? "Outros" : e.Category)
             .Select(g => new CategoryBreakdownDto
             {
@@ -131,10 +179,18 @@ public class FinancialEngineService : IFinancialEngineService
             IncomeSecondTranche = profile.IncomeSecondTranche,
             MonthlyInvestmentGoal = profile.MonthlyInvestmentGoal,
 
+            CreditCardLimit = bankLimit,
+            CustomCardCap = profile.CustomCardCap,
+            AvailableBankCreditLimit = availableBankCreditLimit,
+
             ActiveFixedCommitments = activeCommitmentsList,
             TotalFixedCommitments = totalFixedCommitments,
 
+            ActiveSubscriptions = activeSubscriptionsList,
+            CardSubscriptionsTotal = cardSubscriptionsTotal,
+
             CardHardCap = cardHardCap,
+            CardHardCapFormula = formulaHardCap,
             CurrentInvoiceTotal = currentInvoiceTotal,
             PixCaixinhaUsedInCycle = pixCaixinhaUsedInCycle,
             RemainingBudget = remainingBudget,
@@ -166,7 +222,7 @@ public class FinancialEngineService : IFinancialEngineService
     {
         var profile = await _profileRepository.GetProfileAsync();
         var currentActiveCycle = BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
-        var allCommitments = await _profileRepository.GetFixedCommitmentsAsync(onlyActive: true);
+        var allCommitments = (await _profileRepository.GetFixedCommitmentsAsync(onlyActive: true)).ToList();
 
         var cycles = new List<string>();
         for (int i = 0; i < months; i++)
@@ -177,10 +233,16 @@ public class FinancialEngineService : IFinancialEngineService
         var allExpensesInCycles = (await _expenseRepository.GetExpensesInCyclesAsync(cycles)).ToList();
         var projections = new List<ProjectionCycleDto>();
 
+        // Recurring card subscriptions amount per month
+        var monthlyCardSubscriptions = allCommitments
+            .Where(c => string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(c.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase))
+            .Sum(c => c.Amount);
+
         foreach (var cycle in cycles)
         {
             decimal fixedCommitmentsTotal = 0m;
-            foreach (var commitment in allCommitments)
+            foreach (var commitment in allCommitments.Where(c => !string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase)))
             {
                 var badge = BillingCycleCalculator.GetCommitmentInstallmentStatus(commitment, cycle);
                 if (badge != null)
@@ -190,10 +252,14 @@ public class FinancialEngineService : IFinancialEngineService
             }
 
             var cardInstallments = allExpensesInCycles
-                .Where(e => e.BillingCycle == cycle)
-                .Sum(e => e.Amount);
+                .Where(e => e.BillingCycle == cycle && e.PaymentMethod == "CARD")
+                .Sum(e => e.Amount) + monthlyCardSubscriptions;
 
-            var projectedFreeCap = profile.TotalIncome - profile.MonthlyInvestmentGoal - fixedCommitmentsTotal - cardInstallments;
+            var baseCap = (profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0)
+                ? profile.CustomCardCap.Value
+                : (profile.TotalIncome - profile.MonthlyInvestmentGoal - fixedCommitmentsTotal);
+
+            var projectedFreeCap = baseCap - cardInstallments;
             var projectedDailyBurnRate = Math.Round(projectedFreeCap / 30m, 2);
 
             projections.Add(new ProjectionCycleDto

@@ -48,6 +48,52 @@ public class ExpenseService : IExpenseService
         var profile = await _profileRepository.GetProfileAsync();
         var txDate = dto.TransactionDate ?? DateTime.Now;
         var startCycle = BillingCycleCalculator.GetTargetBillingCycle(txDate, profile.ClosingDay);
+        var paymentMethod = string.IsNullOrWhiteSpace(dto.PaymentMethod) ? "CARD" : dto.PaymentMethod.ToUpperInvariant();
+
+        if (paymentMethod == "PIX_CAIXINHA")
+        {
+            var newBalance = Math.Max(0, profile.NubankCaixinhaBalance - dto.TotalAmount);
+            await _profileRepository.UpdateCaixinhaBalanceAsync(newBalance);
+
+            var pixExpense = new CardExpense
+            {
+                Description = dto.Description.Trim(),
+                Category = string.IsNullOrWhiteSpace(dto.Category) ? "Outros" : dto.Category.Trim(),
+                Amount = dto.TotalAmount,
+                TransactionDate = txDate,
+                BillingCycle = startCycle,
+                InstallmentCurrent = 1,
+                InstallmentTotal = 1,
+                PurchaseGroupId = null,
+                PaymentMethod = "PIX_CAIXINHA",
+                DeductFromCycleCap = dto.DeductFromCycleCap
+            };
+
+            var id = await _expenseRepository.AddExpenseAsync(pixExpense);
+            pixExpense.Id = id;
+            return new List<CardExpense> { pixExpense };
+        }
+
+        if (paymentMethod == "PIX_ACCOUNT")
+        {
+            var accountExpense = new CardExpense
+            {
+                Description = dto.Description.Trim(),
+                Category = string.IsNullOrWhiteSpace(dto.Category) ? "Outros" : dto.Category.Trim(),
+                Amount = dto.TotalAmount,
+                TransactionDate = txDate,
+                BillingCycle = startCycle,
+                InstallmentCurrent = 1,
+                InstallmentTotal = 1,
+                PurchaseGroupId = null,
+                PaymentMethod = "PIX_ACCOUNT",
+                DeductFromCycleCap = dto.DeductFromCycleCap
+            };
+
+            var id = await _expenseRepository.AddExpenseAsync(accountExpense);
+            accountExpense.Id = id;
+            return new List<CardExpense> { accountExpense };
+        }
 
         var installments = Math.Max(1, dto.Installments);
         var createdExpenses = new List<CardExpense>();
@@ -63,7 +109,9 @@ public class ExpenseService : IExpenseService
                 BillingCycle = startCycle,
                 InstallmentCurrent = 1,
                 InstallmentTotal = 1,
-                PurchaseGroupId = null
+                PurchaseGroupId = null,
+                PaymentMethod = "CARD",
+                DeductFromCycleCap = true
             };
 
             var id = await _expenseRepository.AddExpenseAsync(single);
@@ -92,7 +140,9 @@ public class ExpenseService : IExpenseService
                     BillingCycle = cycle,
                     InstallmentCurrent = i,
                     InstallmentTotal = installments,
-                    PurchaseGroupId = groupId
+                    PurchaseGroupId = groupId,
+                    PaymentMethod = "CARD",
+                    DeductFromCycleCap = true
                 };
 
                 createdExpenses.Add(expense);

@@ -1,17 +1,39 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap, PiggyBank, Edit3 } from 'lucide-react';
-import { DashboardSummary } from '@/lib/api';
+import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap, PiggyBank, Edit3, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { api, DashboardSummary } from '@/lib/api';
 
 interface HeroBentoGridProps {
   summary: DashboardSummary | null;
   onOpenUpdateCaixinha?: () => void;
+  onOpenEditCardLimit?: () => void;
+  onCommitmentPaid?: () => void;
 }
 
-export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridProps) {
+export function HeroBentoGrid({
+  summary,
+  onOpenUpdateCaixinha,
+  onOpenEditCardLimit,
+  onCommitmentPaid,
+}: HeroBentoGridProps) {
+  const [payingId, setPayingId] = useState<number | null>(null);
+
   if (!summary) return null;
+
+  const handlePayFromCaixinha = async (commitmentId: number) => {
+    setPayingId(commitmentId);
+    try {
+      await api.payCommitmentFromCaixinha(commitmentId, summary.billingCycle);
+      onCommitmentPaid?.();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao baixar compromisso';
+      alert(`Erro: ${message}`);
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   const isWarning = summary.status === 'WARNING';
   const isCritical = summary.status === 'INVADING_INVESTMENT';
@@ -175,13 +197,33 @@ export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridPr
               <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
                 <Shield className="w-5 h-5" />
               </div>
-              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400">
-                Teto do Cartão
+              <div>
+                <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400 block">
+                  Teto do Cartão
+                </span>
+                {summary.customCardCap && (
+                  <span className="text-[10px] font-mono text-blue-400 font-semibold">
+                    Personalizado
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onOpenEditCardLimit && (
+                <button
+                  onClick={onOpenEditCardLimit}
+                  className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 font-semibold bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  title="Ajustar Limite Bancário ou Teto Mensal"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Ajustar</span>
+                </button>
+              )}
+              <span className="text-xs font-mono font-bold text-zinc-300">
+                {capConsumedPct.toFixed(0)}% Usado
               </span>
             </div>
-            <span className="text-xs font-mono font-bold text-zinc-300">
-              {capConsumedPct.toFixed(0)}% Usado
-            </span>
           </div>
 
           <div className="my-2">
@@ -226,38 +268,90 @@ export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridPr
                 <span>💸 Pix Caixinha: R$ {summary.pixCaixinhaUsedInCycle.toFixed(2)}</span>
               </div>
             )}
+
+            {/* Bank Credit Limit Indicator */}
+            <div className="mt-2.5 p-2 rounded-xl bg-zinc-950/60 border border-zinc-800 text-[11px] font-mono flex items-center justify-between">
+              <span className="text-zinc-400">Limite Banco Livre:</span>
+              <span className="font-bold text-emerald-400">
+                R$ {summary.availableBankCreditLimit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="text-zinc-500 font-normal"> / R$ {summary.creditCardLimit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </span>
+            </div>
+
+            {/* Card Subscriptions Pill if any */}
+            {summary.cardSubscriptionsTotal > 0 && (
+              <div className="mt-1.5 p-2 rounded-xl bg-purple-950/30 border border-purple-500/30 text-[11px] font-mono flex items-center justify-between text-purple-300">
+                <span className="flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3 text-purple-400" />
+                  Assinaturas no Cartão:
+                </span>
+                <span className="font-bold">
+                  R$ {summary.cardSubscriptionsTotal.toFixed(2)} / mês
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Visual Equation Formula */}
           <div className="mt-4 p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-[11px] leading-relaxed">
             <div className="text-zinc-400 font-semibold mb-1 flex items-center gap-1">
               <Zap className="w-3.5 h-3.5 text-amber-400" />
-              Fórmula do Teto Mensal:
+              {summary.customCardCap ? 'Teto Mensal Manual Configurado:' : 'Fórmula do Teto Mensal:'}
             </div>
-            <div className="font-mono text-zinc-300 flex items-center flex-wrap gap-1">
-              <span>R$ {summary.totalIncome.toFixed(0)} (Renda)</span>
-              <span className="text-rose-400">− R$ 1.000 (Meta 🔒)</span>
-              <span className="text-blue-400">− R$ {summary.totalFixedCommitments.toFixed(0)} (Pix)</span>
-              <span>=</span>
-              <span className="text-emerald-400 font-bold">R$ {summary.cardHardCap.toFixed(0)} Teto</span>
-            </div>
+            {summary.customCardCap ? (
+              <div className="font-mono text-zinc-300 flex items-center flex-wrap gap-1">
+                <span className="text-blue-400 font-bold">R$ {summary.customCardCap.toFixed(2)} (Manual)</span>
+                <span className="text-zinc-500 text-[10px]">(Fórmula padrão: R$ {summary.cardHardCapFormula.toFixed(2)})</span>
+              </div>
+            ) : (
+              <div className="font-mono text-zinc-300 flex items-center flex-wrap gap-1">
+                <span>R$ {summary.totalIncome.toFixed(0)} (Renda)</span>
+                <span className="text-rose-400">− R$ 1.000 (Meta 🔒)</span>
+                <span className="text-blue-400">− R$ {summary.totalFixedCommitments.toFixed(0)} (Pix)</span>
+                <span>=</span>
+                <span className="text-emerald-400 font-bold">R$ {summary.cardHardCap.toFixed(0)} Teto</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Active fixed commitments list */}
-        <div className="pt-3 mt-3 border-t border-zinc-800/80 flex flex-wrap gap-1.5">
-          {summary.activeFixedCommitments.map((c) => (
-            <span
-              key={c.id}
-              className="text-[11px] font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-2 py-0.5 rounded-lg flex items-center gap-1"
-            >
-              <span className="text-zinc-400">{c.title}:</span>
-              <span className="font-mono font-medium">R$ {c.amount.toFixed(0)}</span>
-              <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1 rounded">
-                {c.badge}
-              </span>
-            </span>
-          ))}
+        {/* Active fixed commitments list with Pay from Caixinha action */}
+        <div className="pt-3 mt-3 border-t border-zinc-800/80 space-y-1.5">
+          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+            Compromissos do Ciclo:
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {summary.activeFixedCommitments.map((c) => (
+              <div
+                key={c.id}
+                className="text-[11px] font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-2 py-1 rounded-xl flex items-center gap-1.5"
+              >
+                <span className="text-zinc-400">{c.title}:</span>
+                <span className="font-mono font-medium">R$ {c.amount.toFixed(0)}</span>
+                <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1 rounded">
+                  {c.badge}
+                </span>
+
+                {/* Status & action for Caixinha commitments */}
+                {c.paymentSource === 'PIX_CAIXINHA' && (
+                  c.isPaidInCycle ? (
+                    <span className="flex items-center gap-0.5 text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                      <CheckCircle2 className="w-2.5 h-2.5" /> Pago
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handlePayFromCaixinha(c.id)}
+                      disabled={payingId === c.id}
+                      className="text-[10px] font-mono font-bold text-cyan-300 hover:text-cyan-200 bg-cyan-500/20 hover:bg-cyan-500/30 px-1.5 py-0.5 rounded transition-colors cursor-pointer border border-cyan-500/30"
+                      title="Debitar valor da Caixinha Nubank para este ciclo"
+                    >
+                      {payingId === c.id ? 'Baixando...' : 'Dar Baixa 🐷'}
+                    </button>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </motion.div>
 

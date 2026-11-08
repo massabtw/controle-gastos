@@ -27,6 +27,8 @@ public class ProfileRepository : IProfileRepository
                 CdiAnnualRate,
                 NubankCaixinhaBalance,
                 NubankCaixinhaCdiRate,
+                CreditCardLimit,
+                CustomCardCap,
                 GroqApiKey,
                 TelegramBotToken,
                 TelegramAllowedChatId
@@ -57,6 +59,8 @@ public class ProfileRepository : IProfileRepository
                 CdiAnnualRate = @CdiAnnualRate,
                 NubankCaixinhaBalance = @NubankCaixinhaBalance,
                 NubankCaixinhaCdiRate = @NubankCaixinhaCdiRate,
+                CreditCardLimit = @CreditCardLimit,
+                CustomCardCap = @CustomCardCap,
                 GroqApiKey = @GroqApiKey,
                 TelegramBotToken = @TelegramBotToken,
                 TelegramAllowedChatId = @TelegramAllowedChatId
@@ -78,11 +82,55 @@ public class ProfileRepository : IProfileRepository
         return affected > 0;
     }
 
+    public async Task<bool> UpdateCardLimitAsync(decimal creditCardLimit, decimal? customCardCap)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE dbo.FinancialProfile
+            SET CreditCardLimit = @CreditCardLimit,
+                CustomCardCap = @CustomCardCap
+            WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);";
+
+        var affected = await connection.ExecuteAsync(sql, new { CreditCardLimit = creditCardLimit, CustomCardCap = customCardCap });
+        return affected > 0;
+    }
+
+    public async Task<bool> MarkCommitmentPaidFromCaixinhaAsync(int id, string cycle)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        var commitment = await GetFixedCommitmentByIdAsync(id);
+        if (commitment == null) return false;
+
+        if (commitment.LastPaidCycle == cycle)
+        {
+            return true;
+        }
+
+        const string sql = @"
+            BEGIN TRANSACTION;
+
+            UPDATE dbo.FinancialProfile
+            SET NubankCaixinhaBalance = CASE 
+                WHEN NubankCaixinhaBalance - @Amount < 0 THEN 0 
+                ELSE NubankCaixinhaBalance - @Amount 
+            END
+            WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+
+            UPDATE dbo.FixedCommitments
+            SET LastPaidCycle = @Cycle
+            WHERE Id = @Id;
+
+            COMMIT TRANSACTION;";
+
+        var affected = await connection.ExecuteAsync(sql, new { Id = id, Amount = commitment.Amount, Cycle = cycle });
+        return affected > 0;
+    }
+
     public async Task<IEnumerable<FixedCommitment>> GetFixedCommitmentsAsync(bool onlyActive = true)
     {
         using var connection = _connectionFactory.CreateConnection();
         var sql = @"
-            SELECT Id, Title, Amount, StartCycle, TotalInstallments, IsActive
+            SELECT Id, Title, Amount, StartCycle, TotalInstallments, IsActive, CommitmentType, PaymentSource, BillingDay, LastPaidCycle
             FROM dbo.FixedCommitments " +
             (onlyActive ? "WHERE IsActive = 1 " : "") +
             "ORDER BY Id ASC;";
@@ -94,7 +142,7 @@ public class ProfileRepository : IProfileRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            SELECT Id, Title, Amount, StartCycle, TotalInstallments, IsActive
+            SELECT Id, Title, Amount, StartCycle, TotalInstallments, IsActive, CommitmentType, PaymentSource, BillingDay, LastPaidCycle
             FROM dbo.FixedCommitments
             WHERE Id = @Id;";
 
@@ -105,9 +153,9 @@ public class ProfileRepository : IProfileRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            INSERT INTO dbo.FixedCommitments (Title, Amount, StartCycle, TotalInstallments, IsActive)
+            INSERT INTO dbo.FixedCommitments (Title, Amount, StartCycle, TotalInstallments, IsActive, CommitmentType, PaymentSource, BillingDay, LastPaidCycle)
             OUTPUT INSERTED.Id
-            VALUES (@Title, @Amount, @StartCycle, @TotalInstallments, @IsActive);";
+            VALUES (@Title, @Amount, @StartCycle, @TotalInstallments, @IsActive, @CommitmentType, @PaymentSource, @BillingDay, @LastPaidCycle);";
 
         return await connection.ExecuteScalarAsync<int>(sql, commitment);
     }
@@ -121,7 +169,11 @@ public class ProfileRepository : IProfileRepository
                 Amount = @Amount,
                 StartCycle = @StartCycle,
                 TotalInstallments = @TotalInstallments,
-                IsActive = @IsActive
+                IsActive = @IsActive,
+                CommitmentType = @CommitmentType,
+                PaymentSource = @PaymentSource,
+                BillingDay = @BillingDay,
+                LastPaidCycle = @LastPaidCycle
             WHERE Id = @Id;";
 
         var affected = await connection.ExecuteAsync(sql, commitment);

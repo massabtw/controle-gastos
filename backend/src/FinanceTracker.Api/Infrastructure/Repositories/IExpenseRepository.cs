@@ -15,5 +15,6 @@ public interface IExpenseRepository
     Task<int> DeleteExpenseGroupAsync(Guid purchaseGroupId);
     Task<CardExpense?> GetLatestExpenseAsync();
     Task<decimal> GetTotalByCycleAsync(string cycle);
+    Task<decimal> GetTotalCommittedCardExpensesFromCycleAsync(string fromCycle);
     Task<IEnumerable<CardExpense>> GetExpensesInCyclesAsync(IEnumerable<string> cycles);
 }

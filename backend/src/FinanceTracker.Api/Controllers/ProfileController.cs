@@ -51,6 +51,42 @@ public class ProfileController : ControllerBase
         return Ok(new { message = "Caixinha balance updated successfully.", balance = dto.Balance });
     }
 
+    [HttpPatch("card-limit")]
+    public async Task<IActionResult> UpdateCardLimit([FromBody] Domain.Dtos.UpdateCardLimitDto dto)
+    {
+        if (dto.CreditCardLimit <= 0)
+            return BadRequest(new { message = "Credit card limit must be greater than zero." });
+
+        if (dto.CustomCardCap.HasValue && dto.CustomCardCap.Value <= 0)
+            dto.CustomCardCap = null;
+
+        var success = await _profileRepository.UpdateCardLimitAsync(dto.CreditCardLimit, dto.CustomCardCap);
+        if (!success)
+            return BadRequest(new { message = "Could not update credit card limit." });
+
+        return Ok(new
+        {
+            message = "Credit card limit updated successfully.",
+            creditCardLimit = dto.CreditCardLimit,
+            customCardCap = dto.CustomCardCap
+        });
+    }
+
+    [HttpPost("commitments/{id:int}/pay-from-caixinha")]
+    public async Task<IActionResult> PayCommitmentFromCaixinha(int id, [FromQuery] string? cycle)
+    {
+        var profile = await _profileRepository.GetProfileAsync();
+        var targetCycle = string.IsNullOrWhiteSpace(cycle)
+            ? Domain.Services.BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
+            : cycle;
+
+        var success = await _profileRepository.MarkCommitmentPaidFromCaixinhaAsync(id, targetCycle);
+        if (!success)
+            return BadRequest(new { message = "Could not process payment from Caixinha." });
+
+        return Ok(new { message = "Commitment marked as paid from Caixinha.", cycle = targetCycle });
+    }
+
     [HttpPost("commitments")]
     public async Task<IActionResult> AddCommitment([FromBody] FixedCommitment commitment)
     {

@@ -66,7 +66,7 @@ export function QuickCommandBar({ onRefresh }: QuickCommandBarProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Lançamento rápido (ex: 'uber 24,90', 'teclado 300 3x', 'simular 400 4x', '/status' ou '/desfazer')..."
+            placeholder="Lançamento rápido (ex: 'uber 25', 'pix 40 corte', 'fatura atual 350', '/status' ou '/desfazer')..."
             className="w-full bg-transparent text-sm sm:text-base text-zinc-100 placeholder-zinc-500 focus:outline-none"
             disabled={loading}
           />
@@ -112,6 +112,8 @@ export function QuickCommandBar({ onRefresh }: QuickCommandBarProps) {
                 {lastResponse.intent === 'ADD_EXPENSE' ? '💳' :
                  lastResponse.intent === 'SIMULATE' ? '🔮' :
                  lastResponse.intent === 'STATUS' ? '📊' :
+                 lastResponse.intent === 'SYNC_INVOICE' ? '🔄' :
+                 lastResponse.intent === 'UPDATE_CAIXINHA' ? '🐷' :
                  lastResponse.intent === 'UNDO' ? '↩️' : '🤖'}
               </span>
               <div className="whitespace-pre-line text-sm leading-relaxed font-sans">

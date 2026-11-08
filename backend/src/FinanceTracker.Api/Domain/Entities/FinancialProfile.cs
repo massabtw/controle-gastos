@@ -13,6 +13,9 @@ public class FinancialProfile
     public decimal NubankCaixinhaBalance { get; set; } = 0.00m;
     public decimal NubankCaixinhaCdiRate { get; set; } = 115.00m;
 
+    public decimal CreditCardLimit { get; set; } = 2500.00m;
+    public decimal? CustomCardCap { get; set; }
+
     public string? GroqApiKey { get; set; }
     public string? TelegramBotToken { get; set; }
     public long? TelegramAllowedChatId { get; set; }

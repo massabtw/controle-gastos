@@ -25,6 +25,8 @@ BEGIN
         [CdiAnnualRate] DECIMAL(5,2) NOT NULL DEFAULT 11.25,
         [NubankCaixinhaBalance] DECIMAL(12,2) NOT NULL DEFAULT 0.00,
         [NubankCaixinhaCdiRate] DECIMAL(5,2) NOT NULL DEFAULT 115.00,
+        [CreditCardLimit] DECIMAL(12,2) NOT NULL DEFAULT 2500.00,
+        [CustomCardCap] DECIMAL(12,2) NULL,
         [GroqApiKey] NVARCHAR(200) NULL,
         [TelegramBotToken] NVARCHAR(200) NULL,
         [TelegramAllowedChatId] BIGINT NULL
@@ -41,7 +43,11 @@ BEGIN
         [Amount] DECIMAL(10,2) NOT NULL,
         [StartCycle] CHAR(7) NOT NULL, -- Format 'YYYY-MM'
         [TotalInstallments] INT NULL,   -- NULL = recurring indefinitely; INT = fixed duration in months
-        [IsActive] BIT NOT NULL DEFAULT 1
+        [IsActive] BIT NOT NULL DEFAULT 1,
+        [CommitmentType] NVARCHAR(20) NOT NULL DEFAULT 'PIX_COMMITMENT', -- 'PIX_COMMITMENT' or 'SUBSCRIPTION'
+        [PaymentSource] NVARCHAR(20) NOT NULL DEFAULT 'PIX_CAIXINHA',    -- 'CARD', 'PIX_CAIXINHA', or 'PIX_ACCOUNT'
+        [BillingDay] INT NULL DEFAULT 1,
+        [LastPaidCycle] CHAR(7) NULL
     );
 END
 GO
@@ -81,9 +87,9 @@ GO
 IF NOT EXISTS (SELECT 1 FROM [dbo].[FixedCommitments])
 BEGIN
     INSERT INTO [dbo].[FixedCommitments] 
-        ([Title], [Amount], [StartCycle], [TotalInstallments], [IsActive])
+        ([Title], [Amount], [StartCycle], [TotalInstallments], [IsActive], [CommitmentType], [PaymentSource], [BillingDay])
     VALUES 
-        (N'Internet Móvel Mãe', 50.00, '2026-12', NULL, 1),
-        (N'Monitor Mãe', 120.00, '2026-12', 5, 1);
+        (N'Internet Móvel Mãe', 50.00, '2026-12', NULL, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 10),
+        (N'Monitor Mãe', 120.00, '2026-12', 5, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 15);
 END
 GO

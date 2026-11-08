@@ -7,6 +7,8 @@ public class CreateExpenseDto
     public decimal TotalAmount { get; set; }
     public int Installments { get; set; } = 1;
     public DateTime? TransactionDate { get; set; }
+    public string PaymentMethod { get; set; } = "CARD"; // "CARD", "PIX_CAIXINHA", "PIX_ACCOUNT"
+    public bool DeductFromCycleCap { get; set; } = true;
 }
 
 public class UpdateExpenseDto
@@ -24,6 +26,11 @@ public class ActiveCommitmentDto
     public string Title { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string Badge { get; set; } = string.Empty; // e.g. "1/5" or "Fixo"
+    public string CommitmentType { get; set; } = "PIX_COMMITMENT"; // "PIX_COMMITMENT" or "SUBSCRIPTION"
+    public string PaymentSource { get; set; } = "PIX_CAIXINHA";    // "CARD", "PIX_CAIXINHA", "PIX_ACCOUNT"
+    public int? BillingDay { get; set; } = 1;
+    public string? LastPaidCycle { get; set; }
+    public bool IsPaidInCycle { get; set; } = false;
 }
 
 public class CategoryBreakdownDto
@@ -45,10 +52,18 @@ public class DashboardSummaryDto
     public decimal IncomeSecondTranche { get; set; }
     public decimal MonthlyInvestmentGoal { get; set; }
 
+    public decimal CreditCardLimit { get; set; } = 2500.00m;
+    public decimal? CustomCardCap { get; set; }
+    public decimal AvailableBankCreditLimit { get; set; }
+
     public List<ActiveCommitmentDto> ActiveFixedCommitments { get; set; } = new();
     public decimal TotalFixedCommitments { get; set; }
 
+    public List<ActiveCommitmentDto> ActiveSubscriptions { get; set; } = new();
+    public decimal CardSubscriptionsTotal { get; set; }
+
     public decimal CardHardCap { get; set; }
+    public decimal CardHardCapFormula { get; set; }
     public decimal CurrentInvoiceTotal { get; set; }
     public decimal PixCaixinhaUsedInCycle { get; set; }
     public decimal RemainingBudget { get; set; }
@@ -86,6 +101,12 @@ public class SyncInvoiceDto
 public class UpdateCaixinhaDto
 {
     public decimal Balance { get; set; }
+}
+
+public class UpdateCardLimitDto
+{
+    public decimal CreditCardLimit { get; set; }
+    public decimal? CustomCardCap { get; set; }
 }
 
 public class ProjectionCycleDto

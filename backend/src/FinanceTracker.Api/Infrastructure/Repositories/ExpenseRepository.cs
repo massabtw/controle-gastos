@@ -144,6 +144,17 @@ public class ExpenseRepository : IExpenseRepository
         return await connection.ExecuteScalarAsync<decimal>(sql, new { BillingCycle = cycle });
     }
 
+    public async Task<decimal> GetTotalCommittedCardExpensesFromCycleAsync(string fromCycle)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            SELECT ISNULL(SUM(Amount), 0)
+            FROM dbo.CardExpenses
+            WHERE BillingCycle >= @FromCycle AND PaymentMethod = 'CARD';";
+
+        return await connection.ExecuteScalarAsync<decimal>(sql, new { FromCycle = fromCycle });
+    }
+
     public async Task<IEnumerable<CardExpense>> GetExpensesInCyclesAsync(IEnumerable<string> cycles)
     {
         using var connection = _connectionFactory.CreateConnection();
