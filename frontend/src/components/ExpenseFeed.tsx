@@ -78,6 +78,8 @@ export function ExpenseFeed({
         return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
       case 'saúde':
         return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+      case 'entrada':
+        return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
       default:
         return 'bg-zinc-800 text-zinc-300 border-zinc-700';
     }
