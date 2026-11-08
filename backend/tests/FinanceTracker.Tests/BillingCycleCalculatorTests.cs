@@ -85,5 +85,23 @@ public class BillingCycleCalculatorTests
 
         var result5 = RegexExpenseParser.Parse("/desfazer");
         Assert.Equal("UNDO", result5.Intent);
+
+        var result6 = RegexExpenseParser.Parse("pix 40 barbearia");
+        Assert.Equal("ADD_EXPENSE", result6.Intent);
+        Assert.Equal("Barbearia", result6.Description);
+        Assert.Equal(40.00m, result6.Amount);
+        Assert.Equal("PIX_CAIXINHA", result6.PaymentMethod);
+
+        var result7 = RegexExpenseParser.Parse("paguei 25 no pix lanche");
+        Assert.Equal("ADD_EXPENSE", result7.Intent);
+        Assert.Equal("Lanche", result7.Description);
+        Assert.Equal(25.00m, result7.Amount);
+        Assert.Equal("Alimentação", result7.Category);
+        Assert.Equal("PIX_CAIXINHA", result7.PaymentMethod);
+
+        var result8 = RegexExpenseParser.Parse("tirei 100 da caixinha pro pix");
+        Assert.Equal("ADD_EXPENSE", result8.Intent);
+        Assert.Equal(100.00m, result8.Amount);
+        Assert.Equal("PIX_CAIXINHA", result8.PaymentMethod);
     }
 }

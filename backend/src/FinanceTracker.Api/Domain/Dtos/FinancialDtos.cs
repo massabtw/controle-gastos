@@ -50,6 +50,7 @@ public class DashboardSummaryDto
 
     public decimal CardHardCap { get; set; }
     public decimal CurrentInvoiceTotal { get; set; }
+    public decimal PixCaixinhaUsedInCycle { get; set; }
     public decimal RemainingBudget { get; set; }
     public int DaysUntilClosing { get; set; }
     public decimal AvailablePerDay { get; set; }
@@ -135,4 +136,13 @@ public class ChatCommandResponseDto
     public string Reply { get; set; } = string.Empty;
     public string Intent { get; set; } = "UNKNOWN";
     public DashboardSummaryDto? Dashboard { get; set; }
+}
+
+public class CreatePixCaixinhaDto
+{
+    public string Description { get; set; } = string.Empty;
+    public string Category { get; set; } = "Outros";
+    public decimal Amount { get; set; }
+    public bool DeductFromCycleCap { get; set; } = true;
+    public DateTime? TransactionDate { get; set; }
 }

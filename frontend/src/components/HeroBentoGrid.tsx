@@ -16,9 +16,10 @@ export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridPr
   const isWarning = summary.status === 'WARNING';
   const isCritical = summary.status === 'INVADING_INVESTMENT';
 
-  // Percentage of card hard cap consumed
+  // Percentage of card hard cap consumed (including Pix Caixinha)
+  const totalCapUsed = summary.currentInvoiceTotal + (summary.pixCaixinhaUsedInCycle || 0);
   const capConsumedPct = summary.cardHardCap > 0
-    ? Math.min(100, Math.max(0, (summary.currentInvoiceTotal / summary.cardHardCap) * 100))
+    ? Math.min(100, Math.max(0, (totalCapUsed / summary.cardHardCap) * 100))
     : 100;
 
   return (
@@ -111,6 +112,36 @@ export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridPr
                   : 'Fatura fechada'}
               </span>
             </p>
+
+            {/* Spending Pace Indicator */}
+            {summary.totalDaysInCycle > 0 && summary.cycleState === 'CURRENT' && (
+              <div className="mt-3 p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 text-[11px] font-mono">
+                <div className="flex items-center justify-between text-zinc-400 mb-1">
+                  <span>Ritmo de Gasto:</span>
+                  <span
+                    className={
+                      summary.paceStatus === 'AHEAD'
+                        ? 'text-emerald-400 font-bold'
+                        : summary.paceStatus === 'OVERPACED'
+                        ? 'text-amber-400 font-bold'
+                        : 'text-blue-400'
+                    }
+                  >
+                    {summary.paceStatus === 'AHEAD' && 'Cushion Seguro'}
+                    {summary.paceStatus === 'OVERPACED' && 'Gasto Acelerado'}
+                    {summary.paceStatus === 'ON_TRACK' && 'Dentro do Esperado'}
+                  </span>
+                </div>
+                <div className="text-zinc-500 text-[10px]">
+                  Dia {summary.daysElapsed} de {summary.totalDaysInCycle} • Esperado até hoje: R$ {summary.idealPaceAmount.toFixed(0)}
+                  {summary.paceDifference > 0 ? (
+                    <span className="text-amber-400 ml-1">(+R$ {summary.paceDifference.toFixed(0)})</span>
+                  ) : (
+                    <span className="text-emerald-400 ml-1">(-R$ {Math.abs(summary.paceDifference).toFixed(0)})</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -157,7 +188,7 @@ export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridPr
             <div className="flex items-baseline justify-between mb-2">
               <span className="text-2xl font-bold font-mono text-zinc-100">
                 R${' '}
-                {summary.currentInvoiceTotal.toLocaleString('pt-BR', {
+                {totalCapUsed.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
@@ -186,6 +217,15 @@ export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridPr
                 }`}
               />
             </div>
+
+            {/* Pill if Pix Caixinha used */}
+            {summary.pixCaixinhaUsedInCycle > 0 && (
+              <div className="mt-2.5 text-[11px] font-mono flex items-center justify-between p-2 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-300">
+                <span>💳 Cartão: R$ {summary.currentInvoiceTotal.toFixed(2)}</span>
+                <span className="text-zinc-500">+</span>
+                <span>💸 Pix Caixinha: R$ {summary.pixCaixinhaUsedInCycle.toFixed(2)}</span>
+              </div>
+            )}
           </div>
 
           {/* Visual Equation Formula */}

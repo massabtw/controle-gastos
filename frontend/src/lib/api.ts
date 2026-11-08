@@ -26,6 +26,7 @@ export interface DashboardSummary {
   totalFixedCommitments: number;
   cardHardCap: number;
   currentInvoiceTotal: number;
+  pixCaixinhaUsedInCycle: number;
   remainingBudget: number;
   daysUntilClosing: number;
   availablePerDay: number;
@@ -61,6 +62,8 @@ export interface CardExpense {
   installmentCurrent: number;
   installmentTotal: number;
   purchaseGroupId: string | null;
+  paymentMethod: 'CARD' | 'PIX_CAIXINHA';
+  deductFromCycleCap: boolean;
 }
 
 export interface ProjectionCycle {
@@ -161,6 +164,17 @@ export const api = {
     installments: number;
     transactionDate?: string;
   }) => request<CardExpense[]>(`/api/expenses`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  createPixCaixinhaExpense: (data: {
+    description: string;
+    category: string;
+    amount: number;
+    deductFromCycleCap: boolean;
+    transactionDate?: string;
+  }) => request<CardExpense>(`/api/expenses/pix-caixinha`, {
     method: 'POST',
     body: JSON.stringify(data),
   }),

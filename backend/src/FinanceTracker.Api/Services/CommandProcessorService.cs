@@ -34,6 +34,31 @@ public class CommandProcessorService : ICommandProcessorService
         {
             case "ADD_EXPENSE":
             {
+                if (parsed.PaymentMethod == "PIX_CAIXINHA")
+                {
+                    var createdPix = await _expenseService.CreatePixCaixinhaExpenseAsync(new CreatePixCaixinhaDto
+                    {
+                        Description = parsed.Description,
+                        Category = parsed.Category,
+                        Amount = parsed.Amount,
+                        DeductFromCycleCap = true,
+                        TransactionDate = parsed.TransactionDate ?? DateTime.Now
+                    });
+
+                    var dashboardPix = await _financialEngineService.GetDashboardSummaryAsync();
+
+                    var replyPix = $"💸 Pix (Caixinha) registrado: {createdPix.Description} (R$ {createdPix.Amount.ToString("N2", PtBrCulture)})\n" +
+                                   $"🐷 Novo saldo Caixinha: R$ {dashboardPix.NubankCaixinhaBalance.ToString("N2", PtBrCulture)}\n" +
+                                   $"📉 Teto Livre: R$ {dashboardPix.RemainingBudget.ToString("N2", PtBrCulture)} (R$ {dashboardPix.AvailablePerDay.ToString("N2", PtBrCulture)}/dia)";
+
+                    return new ChatCommandResponseDto
+                    {
+                        Intent = "ADD_EXPENSE",
+                        Reply = replyPix,
+                        Dashboard = dashboardPix
+                    };
+                }
+
                 var created = await _expenseService.CreateExpenseAsync(new CreateExpenseDto
                 {
                     Description = parsed.Description,

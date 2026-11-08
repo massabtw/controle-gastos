@@ -17,7 +17,7 @@ public class ExpenseRepository : IExpenseRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId
+            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap
             FROM dbo.CardExpenses
             WHERE BillingCycle = @BillingCycle
             ORDER BY TransactionDate DESC, Id DESC;";
@@ -29,7 +29,7 @@ public class ExpenseRepository : IExpenseRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId
+            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap
             FROM dbo.CardExpenses
             WHERE Id = @Id;";
 
@@ -40,7 +40,7 @@ public class ExpenseRepository : IExpenseRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId
+            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap
             FROM dbo.CardExpenses
             WHERE PurchaseGroupId = @PurchaseGroupId
             ORDER BY InstallmentCurrent ASC;";
@@ -53,10 +53,10 @@ public class ExpenseRepository : IExpenseRepository
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             INSERT INTO dbo.CardExpenses 
-                (Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId)
+                (Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap)
             OUTPUT INSERTED.Id
             VALUES 
-                (@Description, @Category, @Amount, @TransactionDate, @BillingCycle, @InstallmentCurrent, @InstallmentTotal, @PurchaseGroupId);";
+                (@Description, @Category, @Amount, @TransactionDate, @BillingCycle, @InstallmentCurrent, @InstallmentTotal, @PurchaseGroupId, @PaymentMethod, @DeductFromCycleCap);";
 
         return await connection.ExecuteScalarAsync<int>(sql, expense);
     }
@@ -66,9 +66,9 @@ public class ExpenseRepository : IExpenseRepository
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
             INSERT INTO dbo.CardExpenses 
-                (Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId)
+                (Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap)
             VALUES 
-                (@Description, @Category, @Amount, @TransactionDate, @BillingCycle, @InstallmentCurrent, @InstallmentTotal, @PurchaseGroupId);";
+                (@Description, @Category, @Amount, @TransactionDate, @BillingCycle, @InstallmentCurrent, @InstallmentTotal, @PurchaseGroupId, @PaymentMethod, @DeductFromCycleCap);";
 
         await connection.ExecuteAsync(sql, expenses);
     }
@@ -85,7 +85,9 @@ public class ExpenseRepository : IExpenseRepository
                 BillingCycle = @BillingCycle,
                 InstallmentCurrent = @InstallmentCurrent,
                 InstallmentTotal = @InstallmentTotal,
-                PurchaseGroupId = @PurchaseGroupId
+                PurchaseGroupId = @PurchaseGroupId,
+                PaymentMethod = @PaymentMethod,
+                DeductFromCycleCap = @DeductFromCycleCap
             WHERE Id = @Id;";
 
         var affected = await connection.ExecuteAsync(sql, expense);
@@ -124,7 +126,7 @@ public class ExpenseRepository : IExpenseRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            SELECT TOP 1 Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId
+            SELECT TOP 1 Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap
             FROM dbo.CardExpenses
             ORDER BY Id DESC;";
 
@@ -137,7 +139,7 @@ public class ExpenseRepository : IExpenseRepository
         const string sql = @"
             SELECT ISNULL(SUM(Amount), 0)
             FROM dbo.CardExpenses
-            WHERE BillingCycle = @BillingCycle;";
+            WHERE BillingCycle = @BillingCycle AND PaymentMethod = 'CARD';";
 
         return await connection.ExecuteScalarAsync<decimal>(sql, new { BillingCycle = cycle });
     }
@@ -146,7 +148,7 @@ public class ExpenseRepository : IExpenseRepository
     {
         using var connection = _connectionFactory.CreateConnection();
         const string sql = @"
-            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId
+            SELECT Id, Description, Category, Amount, TransactionDate, BillingCycle, InstallmentCurrent, InstallmentTotal, PurchaseGroupId, PaymentMethod, DeductFromCycleCap
             FROM dbo.CardExpenses
             WHERE BillingCycle IN @Cycles;";
 

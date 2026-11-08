@@ -58,7 +58,9 @@ BEGIN
         [BillingCycle] CHAR(7) NOT NULL, -- Format 'YYYY-MM'
         [InstallmentCurrent] INT NOT NULL DEFAULT 1,
         [InstallmentTotal] INT NOT NULL DEFAULT 1,
-        [PurchaseGroupId] UNIQUEIDENTIFIER NULL
+        [PurchaseGroupId] UNIQUEIDENTIFIER NULL,
+        [PaymentMethod] NVARCHAR(20) NOT NULL DEFAULT 'CARD',
+        [DeductFromCycleCap] BIT NOT NULL DEFAULT 1
     );
 
     CREATE INDEX IX_CardExpenses_BillingCycle ON [dbo].[CardExpenses]([BillingCycle]);

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   selectedCycle: string;
   onCycleChange: (cycle: string) => void;
   onOpenNewExpense: () => void;
+  onOpenPixCaixinha?: () => void;
   onOpenSyncInvoice?: () => void;
   onOpenSettings: () => void;
 }
@@ -18,6 +19,7 @@ export function Header({
   selectedCycle,
   onCycleChange,
   onOpenNewExpense,
+  onOpenPixCaixinha,
   onOpenSyncInvoice,
   onOpenSettings,
 }: HeaderProps) {
@@ -119,6 +121,17 @@ export function Header({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
+        {onOpenPixCaixinha && (
+          <button
+            onClick={onOpenPixCaixinha}
+            title="Retirar dinheiro da Caixinha para pagar no Pix"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-200 text-xs sm:text-sm font-medium transition-colors shadow-sm"
+          >
+            <Send className="w-4 h-4 text-cyan-400" />
+            <span className="hidden sm:inline">Retirar p/ Pix</span>
+          </button>
+        )}
+
         {onOpenSyncInvoice && (
           <button
             onClick={onOpenSyncInvoice}

@@ -57,18 +57,22 @@ public class GroqExpenseParserService : IGroqExpenseParserService
             var systemPrompt = @"Você é um assistente financeiro especialista em interpretar comandos e despesas em português brasileiro informal.
 Sua tarefa é analisar a mensagem do usuário e retornar EXCLUSIVAMENTE um JSON com os seguintes campos:
 - intent: 'ADD_EXPENSE' (para compras/gastos), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
-- description: Título limpo e capitalizado do gasto (ex: 'Uber', 'Almoço no Shopping', 'Teclado Mecânico').
+- description: Título limpo e capitalizado do gasto (ex: 'Uber', 'Almoço no Shopping', 'Barbearia', 'Lanche', 'Pix Caixinha').
 - amount: Valor numérico em reais (ex: 25.00, 150.50).
 - installments: Quantidade de parcelas (inteiro, padrão 1 se for à vista).
 - category: Escolha exatamente uma entre: 'Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'.
+- paymentMethod: 'PIX_CAIXINHA' se o usuário mencionar 'pix', 'caixinha', 'retirar da caixinha', 'pagar no pix'; caso contrário 'CARD'.
 - transactionDate: Se o usuário mencionar 'ontem' ou uma data específica, retorne em formato 'YYYY-MM-DD', senão null.
 
 Exemplos:
-'uber 25' -> {'intent': 'ADD_EXPENSE', 'description': 'Uber', 'amount': 25.0, 'installments': 1, 'category': 'Transporte', 'transactionDate': null}
-'comprei um jogo 150 em 3x' -> {'intent': 'ADD_EXPENSE', 'description': 'Jogo', 'amount': 150.0, 'installments': 3, 'category': 'Lazer', 'transactionDate': null}
-'simular 400 4x' -> {'intent': 'SIMULATE', 'description': 'Simulação', 'amount': 400.0, 'installments': 4, 'category': 'Compras', 'transactionDate': null}
-'/status' -> {'intent': 'STATUS', 'description': '', 'amount': 0.0, 'installments': 1, 'category': 'Outros', 'transactionDate': null}
-'/desfazer' -> {'intent': 'UNDO', 'description': '', 'amount': 0.0, 'installments': 1, 'category': 'Outros', 'transactionDate': null}
+'uber 25' -> {'intent': 'ADD_EXPENSE', 'description': 'Uber', 'amount': 25.0, 'installments': 1, 'category': 'Transporte', 'paymentMethod': 'CARD', 'transactionDate': null}
+'pix 40 barbearia' -> {'intent': 'ADD_EXPENSE', 'description': 'Barbearia', 'amount': 40.0, 'installments': 1, 'category': 'Saúde', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
+'paguei 25 no pix lanche' -> {'intent': 'ADD_EXPENSE', 'description': 'Lanche', 'amount': 25.0, 'installments': 1, 'category': 'Alimentação', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
+'tirei 100 da caixinha pro pix' -> {'intent': 'ADD_EXPENSE', 'description': 'Pix Caixinha', 'amount': 100.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
+'comprei um jogo 150 em 3x' -> {'intent': 'ADD_EXPENSE', 'description': 'Jogo', 'amount': 150.0, 'installments': 3, 'category': 'Lazer', 'paymentMethod': 'CARD', 'transactionDate': null}
+'simular 400 4x' -> {'intent': 'SIMULATE', 'description': 'Simulação', 'amount': 400.0, 'installments': 4, 'category': 'Compras', 'paymentMethod': 'CARD', 'transactionDate': null}
+'/status' -> {'intent': 'STATUS', 'description': '', 'amount': 0.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'CARD', 'transactionDate': null}
+'/desfazer' -> {'intent': 'UNDO', 'description': '', 'amount': 0.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'CARD', 'transactionDate': null}
 ";
 
             var requestBody = new

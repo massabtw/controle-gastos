@@ -59,10 +59,11 @@ public class FinancialEngineService : IFinancialEngineService
         var totalIncome = profile.TotalIncome;
         var cardHardCap = totalIncome - profile.MonthlyInvestmentGoal - totalFixedCommitments;
 
-        // Card expenses in target cycle
+        // Expenses in target cycle
         var expenses = (await _expenseRepository.GetExpensesByCycleAsync(targetCycle)).ToList();
-        var currentInvoiceTotal = expenses.Sum(e => e.Amount);
-        var remainingBudget = cardHardCap - currentInvoiceTotal;
+        var currentInvoiceTotal = expenses.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
+        var pixCaixinhaUsedInCycle = expenses.Where(e => e.PaymentMethod == "PIX_CAIXINHA" && e.DeductFromCycleCap).Sum(e => e.Amount);
+        var remainingBudget = cardHardCap - currentInvoiceTotal - pixCaixinhaUsedInCycle;
 
         var daysUntilClosing = BillingCycleCalculator.GetDaysUntilClosing(DateTime.Now, profile.ClosingDay, targetCycle);
 
@@ -135,6 +136,7 @@ public class FinancialEngineService : IFinancialEngineService
 
             CardHardCap = cardHardCap,
             CurrentInvoiceTotal = currentInvoiceTotal,
+            PixCaixinhaUsedInCycle = pixCaixinhaUsedInCycle,
             RemainingBudget = remainingBudget,
             DaysUntilClosing = daysUntilClosing,
             AvailablePerDay = availablePerDay,

@@ -19,6 +19,9 @@ public class ParsedExpenseIntent
     [JsonPropertyName("category")]
     public string Category { get; set; } = "Outros";
 
+    [JsonPropertyName("paymentMethod")]
+    public string PaymentMethod { get; set; } = "CARD"; // "CARD" or "PIX_CAIXINHA"
+
     [JsonPropertyName("transactionDate")]
     public DateTime? TransactionDate { get; set; }
 }

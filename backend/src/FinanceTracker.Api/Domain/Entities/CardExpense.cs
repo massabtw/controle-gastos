@@ -11,4 +11,6 @@ public class CardExpense
     public int InstallmentCurrent { get; set; } = 1;
     public int InstallmentTotal { get; set; } = 1;
     public Guid? PurchaseGroupId { get; set; }
+    public string PaymentMethod { get; set; } = "CARD"; // "CARD" | "PIX_CAIXINHA"
+    public bool DeductFromCycleCap { get; set; } = true;
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Tag, Calendar, Trash2, Edit2, Plus } from 'lucide-react';
+import { CreditCard, Tag, Calendar, Trash2, Edit2, Plus, Search, Download, X, Send } from 'lucide-react';
 import { CardExpense, CategoryBreakdown } from '@/lib/api';
 
 interface ExpenseFeedProps {
@@ -24,9 +24,44 @@ export function ExpenseFeed({
   onDeleteExpense,
   onOpenNewExpense,
 }: ExpenseFeedProps) {
-  const filteredExpenses = selectedCategory
-    ? expenses.filter((e) => e.category.toLowerCase() === selectedCategory.toLowerCase())
-    : expenses;
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredExpenses = expenses.filter((e) => {
+    const matchesCategory = selectedCategory
+      ? e.category.toLowerCase() === selectedCategory.toLowerCase()
+      : true;
+
+    const matchesSearch = searchQuery.trim()
+      ? e.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.amount.toString().includes(searchQuery)
+      : true;
+
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleExportCsv = () => {
+    if (expenses.length === 0) return;
+
+    const headers = ['Data', 'Descricao', 'Categoria', 'Parcela', 'Valor_RS'];
+    const rows = filteredExpenses.map((e) => [
+      new Date(e.transactionDate).toLocaleDateString('pt-BR'),
+      `"${e.description.replace(/"/g, '""')}"`,
+      e.category,
+      e.installmentTotal > 1 ? `${e.installmentCurrent}/${e.installmentTotal}` : 'A vista',
+      e.amount.toFixed(2).replace('.', ','),
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `fatura-gastos-${expenses[0]?.billingCycle || 'export'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Category badge color helper
   const getCategoryColor = (category: string) => {
@@ -69,13 +104,43 @@ export function ExpenseFeed({
           </div>
         </div>
 
-        <button
-          onClick={onOpenNewExpense}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-semibold transition-all self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Lançar Manual</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar gasto..."
+              className="bg-zinc-950/70 border border-zinc-700/80 rounded-xl py-1.5 pl-8 pr-7 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 w-36 sm:w-44"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={handleExportCsv}
+            title="Exportar lançamentos deste ciclo para planilha Excel/CSV"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-all cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">CSV</span>
+          </button>
+
+          <button
+            onClick={onOpenNewExpense}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all cursor-pointer shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Lançar Manual</span>
+          </button>
+        </div>
       </div>
 
       {/* Category breakdown filter pills */}
@@ -118,6 +183,7 @@ export function ExpenseFeed({
           <AnimatePresence>
             {filteredExpenses.map((expense) => {
               const isInstallment = expense.installmentTotal > 1;
+              const isPix = expense.paymentMethod === 'PIX_CAIXINHA';
 
               return (
                 <motion.div
@@ -128,15 +194,27 @@ export function ExpenseFeed({
                   className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-all group"
                 >
                   <div className="flex items-center gap-3.5">
-                    <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-zinc-200 transition-colors">
-                      <Tag className="w-4 h-4" />
+                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
+                      isPix ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 group-hover:text-zinc-200'
+                    }`}>
+                      {isPix ? <Send className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
                     </div>
 
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-zinc-100">
                           {expense.description}
                         </span>
+
+                        {isPix ? (
+                          <span className="text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                            💸 Pix Caixinha
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono font-medium bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                            💳 Cartão
+                          </span>
+                        )}
 
                         <span
                           className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getCategoryColor(

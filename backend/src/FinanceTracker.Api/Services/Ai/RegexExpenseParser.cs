@@ -59,7 +59,42 @@ public static class RegexExpenseParser
             text = text.Replace("ontem", "").Trim();
         }
 
-        // 5. Add Expense parsing
+        // 5. Pix / Caixinha check
+        var isPix = Regex.IsMatch(text, @"\b(pix|caixinha)\b", RegexOptions.IgnoreCase);
+        if (isPix)
+        {
+            var amountMatch = Regex.Match(text, @"(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)", RegexOptions.IgnoreCase);
+            if (amountMatch.Success && decimal.TryParse(amountMatch.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var pixAmount) && pixAmount > 0)
+            {
+                var remaining = text.Remove(amountMatch.Index, amountMatch.Length).Trim();
+                var cleanDesc = Regex.Replace(remaining, @"\b(tirei\s+da\s+caixinha\s+pro\s+pix|tirei\s+da\s+caixinha|retirar\s+da\s+caixinha|da\s+caixinha|na\s+caixinha|caixinha|no\s+pix|pro\s+pix|pelo\s+pix|pix|comprei(?:\s+um|\s+uma)?|paguei(?:\s+o|\s+a)?|gastei\s+com|gastei|com|em|no|na|de|do|da|o|a|pro|para)\b", " ", RegexOptions.IgnoreCase);
+                cleanDesc = Regex.Replace(cleanDesc, @"\s+", " ").Trim();
+
+                if (string.IsNullOrWhiteSpace(cleanDesc))
+                {
+                    cleanDesc = "Pix Caixinha";
+                }
+                else
+                {
+                    cleanDesc = char.ToUpperInvariant(cleanDesc[0]) + cleanDesc.Substring(1);
+                }
+
+                var category = InferCategory(cleanDesc);
+
+                return new ParsedExpenseIntent
+                {
+                    Intent = "ADD_EXPENSE",
+                    Description = cleanDesc,
+                    Amount = pixAmount,
+                    Installments = 1,
+                    Category = category,
+                    PaymentMethod = "PIX_CAIXINHA",
+                    TransactionDate = targetDate
+                };
+            }
+        }
+
+        // 6. Regular Card Expense parsing
         // Matches patterns like:
         // "uber 25", "uber 24,90", "comprei jogo 150 em 3x", "teclado 300 3x", "almoço 45.00"
         var expenseRegex = new Regex(
@@ -100,6 +135,7 @@ public static class RegexExpenseParser
                     Amount = amount,
                     Installments = installments,
                     Category = category,
+                    PaymentMethod = "CARD",
                     TransactionDate = targetDate
                 };
             }
