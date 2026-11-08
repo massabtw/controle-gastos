@@ -28,6 +28,7 @@ builder.Services.AddScoped<IFinancialEngineService, FinancialEngineService>();
 builder.Services.AddScoped<IGroqExpenseParserService, GroqExpenseParserService>();
 builder.Services.AddScoped<ICommandProcessorService, CommandProcessorService>();
 builder.Services.AddScoped<ITelegramBotService, TelegramBotService>();
+builder.Services.AddHostedService<TelegramPollingBackgroundService>();
 
 // CORS configuration for Frontend (Next.js localhost:3000)
 builder.Services.AddCors(options =>
