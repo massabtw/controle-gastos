@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, Tag, Calendar, Trash2, Edit2, Plus, Search, Download, X, Send } from 'lucide-react';
+import { CreditCard, Tag, Calendar, Trash2, Edit2, Plus, Search, Download, X, Send, ArrowDownLeft } from 'lucide-react';
 import { CardExpense, CategoryBreakdown } from '@/lib/api';
 
 interface ExpenseFeedProps {
@@ -184,6 +184,7 @@ export function ExpenseFeed({
             {filteredExpenses.map((expense) => {
               const isInstallment = expense.installmentTotal > 1;
               const isPix = expense.paymentMethod === 'PIX_CAIXINHA';
+              const isPixInflow = expense.paymentMethod === 'PIX_INFLOW';
 
               return (
                 <motion.div
@@ -195,9 +196,13 @@ export function ExpenseFeed({
                 >
                   <div className="flex items-center gap-3.5">
                     <div className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
-                      isPix ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' : 'bg-zinc-900 border-zinc-800 text-zinc-400 group-hover:text-zinc-200'
+                      isPixInflow
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        : isPix
+                        ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 group-hover:text-zinc-200'
                     }`}>
-                      {isPix ? <Send className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
+                      {isPixInflow ? <ArrowDownLeft className="w-4 h-4" /> : isPix ? <Send className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
                     </div>
 
                     <div>
@@ -206,7 +211,11 @@ export function ExpenseFeed({
                           {expense.description}
                         </span>
 
-                        {isPix ? (
+                        {isPixInflow ? (
+                          <span className="text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                            💰 Pix Recebido (Caixinha)
+                          </span>
+                        ) : isPix ? (
                           <span className="text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-1">
                             💸 Pix Caixinha
                           </span>
@@ -242,8 +251,8 @@ export function ExpenseFeed({
 
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <span className="font-mono font-bold text-base text-zinc-100">
-                        R${' '}
+                      <span className={`font-mono font-bold text-base ${isPixInflow ? 'text-emerald-400' : 'text-zinc-100'}`}>
+                        {isPixInflow ? '+ ' : ''}R${' '}
                         {expense.amount.toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,

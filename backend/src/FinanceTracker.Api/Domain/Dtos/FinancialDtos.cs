@@ -175,3 +175,17 @@ public class CreatePixCaixinhaDto
     public bool DeductFromCycleCap { get; set; } = true;
     public DateTime? TransactionDate { get; set; }
 }
+
+public class DepositCaixinhaDto
+{
+    public decimal Amount { get; set; }
+    public string? Description { get; set; }
+}
+
+public class ReceivePixInflowDto
+{
+    public string Description { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string? Category { get; set; } = "Entrada";
+    public DateTime? TransactionDate { get; set; }
+}

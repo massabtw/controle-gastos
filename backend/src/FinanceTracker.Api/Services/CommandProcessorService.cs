@@ -235,6 +235,48 @@ public class CommandProcessorService : ICommandProcessorService
                 };
             }
 
+            case "DEPOSIT_CAIXINHA":
+            {
+                var newBalance = await _profileRepository.DepositCaixinhaAsync(parsed.Amount);
+                var dashboard = await _financialEngineService.GetDashboardSummaryAsync();
+
+                var reply = $"🐷 R$ {parsed.Amount.ToString("N2", PtBrCulture)} adicionados à Caixinha Nubank (115% CDI)!\n" +
+                            $"💰 Novo saldo Caixinha: R$ {newBalance.ToString("N2", PtBrCulture)}\n" +
+                            $"📈 Rendimento estimado: +R$ {dashboard.NubankCaixinhaMonthlyYield.ToString("N2", PtBrCulture)}/mês (+R$ {dashboard.NubankCaixinhaDailyYield.ToString("N2", PtBrCulture)}/dia)";
+
+                return new ChatCommandResponseDto
+                {
+                    Intent = "DEPOSIT_CAIXINHA",
+                    Reply = reply,
+                    Dashboard = dashboard
+                };
+            }
+
+            case "RECEIVE_PIX":
+            {
+                var created = await _expenseService.ReceivePixInflowAsync(new ReceivePixInflowDto
+                {
+                    Description = string.IsNullOrWhiteSpace(parsed.Description) ? "Pix Recebido" : parsed.Description,
+                    Amount = parsed.Amount,
+                    Category = string.IsNullOrWhiteSpace(parsed.Category) || parsed.Category == "Outros" ? "Entrada" : parsed.Category,
+                    TransactionDate = parsed.TransactionDate ?? DateTime.Now
+                });
+
+                var dashboard = await _financialEngineService.GetDashboardSummaryAsync();
+
+                var reply = $"💰 Pix Recebido registrado: {created.Description} (+R$ {created.Amount.ToString("N2", PtBrCulture)})\n" +
+                            $"🐷 O valor foi enviado diretamente para a Caixinha Nubank (115% CDI)!\n" +
+                            $"💰 Novo saldo Caixinha: R$ {dashboard.NubankCaixinhaBalance.ToString("N2", PtBrCulture)}\n" +
+                            $"📈 Rendimento estimado: +R$ {dashboard.NubankCaixinhaMonthlyYield.ToString("N2", PtBrCulture)}/mês";
+
+                return new ChatCommandResponseDto
+                {
+                    Intent = "RECEIVE_PIX",
+                    Reply = reply,
+                    Dashboard = dashboard
+                };
+            }
+
             case "SIMULATE":
             {
                 var sim = await _financialEngineService.SimulatePurchaseAsync(new SimulatorRequestDto

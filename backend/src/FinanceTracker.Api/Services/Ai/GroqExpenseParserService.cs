@@ -56,15 +56,20 @@ public class GroqExpenseParserService : IGroqExpenseParserService
         {
             var systemPrompt = @"Você é um assistente financeiro especialista em interpretar comandos e despesas em português brasileiro informal.
 Sua tarefa é analisar a mensagem do usuário e retornar EXCLUSIVAMENTE um JSON com os seguintes campos:
-- intent: 'ADD_EXPENSE' (para compras/gastos), 'PAY_INVOICE' (para 'paguei a fatura', 'fatura paga', 'quitar fatura'), 'INVEST_SURPLUS' (para 'investir sobra', 'guardar sobra'), 'SYNC_INVOICE' (ajustar fatura atual), 'UPDATE_CAIXINHA' (atualizar saldo da Caixinha), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
-- description: Título limpo e capitalizado do gasto ou comando (ex: 'Uber', 'Almoço no Shopping', 'Barbearia', 'Lanche', 'Pix Caixinha', 'Ajuste de Fatura', 'Saldo Caixinha').
+- intent: 'ADD_EXPENSE' (para compras/gastos), 'RECEIVE_PIX' (quando o usuário recebe Pix/dinheiro externo/reembolso: 'recebi 50 pix do joao', 'recebi pix 30', 'reembolso 40'), 'DEPOSIT_CAIXINHA' (quando o usuário quer adicionar/guardar valor na Caixinha: '+10 caixinha', 'guardar 50 na caixinha', 'adicionar 100 na caixinha', 'botar 20 na caixinha'), 'PAY_INVOICE' (para 'paguei a fatura', 'fatura paga', 'quitar fatura'), 'INVEST_SURPLUS' (para 'investir sobra', 'guardar sobra'), 'SYNC_INVOICE' (ajustar fatura atual), 'UPDATE_CAIXINHA' (atualizar saldo total da Caixinha), 'SIMULATE' (para simular compras), 'STATUS' (para ver resumo/fatura), 'UNDO' (para desfazer último lançamento), ou 'UNKNOWN' (se não fizer sentido).
+- description: Título limpo e capitalizado do gasto ou comando (ex: 'Uber', 'Almoço no Shopping', 'Barbearia', 'Lanche', 'Pix Caixinha', 'Pix do João', 'Depósito Caixinha', 'Ajuste de Fatura', 'Saldo Caixinha').
 - amount: Valor numérico em reais (ex: 25.00, 150.50, 350.0, 4500.0).
 - installments: Quantidade de parcelas (inteiro, padrão 1 se for à vista).
-- category: Escolha exatamente uma entre: 'Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'.
-- paymentMethod: 'PIX_CAIXINHA' se o usuário mencionar 'pix', 'caixinha', 'retirar da caixinha', 'pagar no pix'; caso contrário 'CARD'.
+- category: Escolha exatamente uma entre: 'Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Entrada', 'Outros'.
+- paymentMethod: 'PIX_INFLOW' se for recebimento/reembolso; 'PIX_CAIXINHA' se o usuário mencionar 'pix', 'caixinha', 'retirar da caixinha', 'pagar no pix'; caso contrário 'CARD'.
 - transactionDate: Se o usuário mencionar 'ontem' ou uma data específica, retorne em formato 'YYYY-MM-DD', senão null.
 
 Exemplos:
+'recebi 50 pix do joao' -> {'intent': 'RECEIVE_PIX', 'description': 'Pix do João', 'amount': 50.0, 'installments': 1, 'category': 'Entrada', 'paymentMethod': 'PIX_INFLOW', 'transactionDate': null}
+'recebi pix 30 lanche' -> {'intent': 'RECEIVE_PIX', 'description': 'Reembolso Lanche', 'amount': 30.0, 'installments': 1, 'category': 'Entrada', 'paymentMethod': 'PIX_INFLOW', 'transactionDate': null}
+'+10 caixinha' -> {'intent': 'DEPOSIT_CAIXINHA', 'description': 'Depósito Caixinha', 'amount': 10.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
+'guardar 50 na caixinha' -> {'intent': 'DEPOSIT_CAIXINHA', 'description': 'Depósito Caixinha', 'amount': 50.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
+'adicionar 100 na caixinha' -> {'intent': 'DEPOSIT_CAIXINHA', 'description': 'Depósito Caixinha', 'amount': 100.0, 'installments': 1, 'category': 'Outros', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
 'uber 25' -> {'intent': 'ADD_EXPENSE', 'description': 'Uber', 'amount': 25.0, 'installments': 1, 'category': 'Transporte', 'paymentMethod': 'CARD', 'transactionDate': null}
 'pix 40 barbearia' -> {'intent': 'ADD_EXPENSE', 'description': 'Barbearia', 'amount': 40.0, 'installments': 1, 'category': 'Saúde', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}
 'paguei 25 no pix lanche' -> {'intent': 'ADD_EXPENSE', 'description': 'Lanche', 'amount': 25.0, 'installments': 1, 'category': 'Alimentação', 'paymentMethod': 'PIX_CAIXINHA', 'transactionDate': null}

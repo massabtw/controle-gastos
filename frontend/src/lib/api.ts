@@ -81,7 +81,7 @@ export interface CardExpense {
   installmentCurrent: number;
   installmentTotal: number;
   purchaseGroupId: string | null;
-  paymentMethod: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT';
+  paymentMethod: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT' | 'PIX_INFLOW';
   deductFromCycleCap: boolean;
 }
 
@@ -253,6 +253,23 @@ export const api = {
     request<{ message: string; balance: number }>(`/api/profile/caixinha`, {
       method: 'POST',
       body: JSON.stringify({ balance }),
+    }),
+
+  depositCaixinha: (amount: number, description?: string) =>
+    request<{ message: string; balance: number; amount: number }>(`/api/profile/caixinha/deposit`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, description }),
+    }),
+
+  receivePix: (data: {
+    description: string;
+    amount: number;
+    category?: string;
+    transactionDate?: string;
+  }) =>
+    request<CardExpense>(`/api/expenses/receive-pix`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   // Invoice Payment (2nd Tranche Salary Sync)

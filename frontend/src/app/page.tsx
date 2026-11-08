@@ -19,6 +19,8 @@ import {
   PixCaixinhaModal,
   EditCardLimitModal,
   NewSubscriptionModal,
+  DepositCaixinhaModal,
+  ReceivePixModal,
 } from '@/components/Modals';
 
 export default function Home() {
@@ -36,6 +38,8 @@ export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSyncInvoiceOpen, setIsSyncInvoiceOpen] = useState(false);
   const [isUpdateCaixinhaOpen, setIsUpdateCaixinhaOpen] = useState(false);
+  const [isDepositCaixinhaOpen, setIsDepositCaixinhaOpen] = useState(false);
+  const [isReceivePixOpen, setIsReceivePixOpen] = useState(false);
   const [isPixCaixinhaOpen, setIsPixCaixinhaOpen] = useState(false);
   const [isEditCardLimitOpen, setIsEditCardLimitOpen] = useState(false);
   const [isNewSubscriptionOpen, setIsNewSubscriptionOpen] = useState(false);
@@ -87,6 +91,7 @@ export default function Home() {
           onCycleChange={handleCycleChange}
           onOpenNewExpense={() => setIsNewExpenseOpen(true)}
           onOpenPixCaixinha={() => setIsPixCaixinhaOpen(true)}
+          onOpenReceivePix={() => setIsReceivePixOpen(true)}
           onOpenSyncInvoice={() => setIsSyncInvoiceOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
@@ -98,6 +103,8 @@ export default function Home() {
         <HeroBentoGrid
           summary={summary}
           onOpenUpdateCaixinha={() => setIsUpdateCaixinhaOpen(true)}
+          onOpenDepositCaixinha={() => setIsDepositCaixinhaOpen(true)}
+          onOpenReceivePix={() => setIsReceivePixOpen(true)}
           onOpenEditCardLimit={() => setIsEditCardLimitOpen(true)}
           onCommitmentPaid={loadData}
           onInvoiceStatusChanged={loadData}
@@ -219,6 +226,21 @@ export default function Home() {
         currentBalance={summary?.nubankCaixinhaBalance ?? 0}
         cdiAnnualRate={summary?.cdiAnnualRate ?? 11.25}
         onClose={() => setIsUpdateCaixinhaOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <DepositCaixinhaModal
+        isOpen={isDepositCaixinhaOpen}
+        currentBalance={summary?.nubankCaixinhaBalance ?? 0}
+        cdiAnnualRate={summary?.cdiAnnualRate ?? 11.25}
+        onClose={() => setIsDepositCaixinhaOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <ReceivePixModal
+        isOpen={isReceivePixOpen}
+        currentBalance={summary?.nubankCaixinhaBalance ?? 0}
+        onClose={() => setIsReceivePixOpen(false)}
         onSuccess={loadData}
       />
 

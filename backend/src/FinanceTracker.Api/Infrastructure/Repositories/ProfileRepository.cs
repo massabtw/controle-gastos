@@ -82,6 +82,19 @@ public class ProfileRepository : IProfileRepository
         return affected > 0;
     }
 
+    public async Task<decimal> DepositCaixinhaAsync(decimal amount)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE dbo.FinancialProfile
+            SET NubankCaixinhaBalance = NubankCaixinhaBalance + @Amount
+            WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+
+            SELECT TOP 1 NubankCaixinhaBalance FROM dbo.FinancialProfile ORDER BY Id ASC;";
+
+        return await connection.ExecuteScalarAsync<decimal>(sql, new { Amount = amount });
+    }
+
     public async Task<bool> UpdateCardLimitAsync(decimal creditCardLimit, decimal? customCardCap)
     {
         using var connection = _connectionFactory.CreateConnection();

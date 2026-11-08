@@ -51,6 +51,21 @@ public class ProfileController : ControllerBase
         return Ok(new { message = "Caixinha balance updated successfully.", balance = dto.Balance });
     }
 
+    [HttpPost("caixinha/deposit")]
+    public async Task<IActionResult> DepositCaixinha([FromBody] Domain.Dtos.DepositCaixinhaDto dto)
+    {
+        if (dto.Amount <= 0)
+            return BadRequest(new { message = "Amount must be greater than zero." });
+
+        var newBalance = await _profileRepository.DepositCaixinhaAsync(dto.Amount);
+        return Ok(new
+        {
+            message = $"R$ {dto.Amount:F2} adicionados à Caixinha com sucesso.",
+            amount = dto.Amount,
+            balance = newBalance
+        });
+    }
+
     [HttpPatch("card-limit")]
     public async Task<IActionResult> UpdateCardLimit([FromBody] Domain.Dtos.UpdateCardLimitDto dto)
     {

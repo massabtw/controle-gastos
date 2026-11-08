@@ -64,6 +64,63 @@ public static class RegexExpenseParser
             };
         }
 
+        // 4.1 Deposit/Add to Caixinha: "+10 caixinha", "+ 10 reais na caixinha", "adicionar 50 na caixinha", "guardar 100 na caixinha", "colocar 20 na caixinha", "botar 10 na caixinha"
+        var depositMatch = Regex.Match(
+            text,
+            @"^(?:(?:\+|\/)?\s*(?:adicionar|guardar|colocar|depositar|botar|\+)\s*(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)\s*(?:reais\s*)?(?:na\s+caixinha|pra\s+caixinha|a\s+caixinha|caixinha)?|caixinha\s*\+\s*(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?))$",
+            RegexOptions.IgnoreCase
+        );
+        if (depositMatch.Success)
+        {
+            var rawVal = depositMatch.Groups[1].Success ? depositMatch.Groups[1].Value : depositMatch.Groups[2].Value;
+            if (decimal.TryParse(rawVal.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var depositAmount) && depositAmount > 0)
+            {
+                return new ParsedExpenseIntent
+                {
+                    Intent = "DEPOSIT_CAIXINHA",
+                    Amount = depositAmount,
+                    Description = "Depósito Caixinha"
+                };
+            }
+        }
+
+        // 4.2 Receive External Pix / Reimbursement: "recebi 50 pix do joao", "recebi pix 30 lanche", "pix recebido 40", "reembolso 50 pix", "recebi 100 de reembolso"
+        var receiveMatch = Regex.Match(
+            text,
+            @"^(?:recebi|pix\s+recebido|reembolso|recebido|recebimento)\s+(?:(?:de\s+)?(?:reembolso|pix)\s+)?(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(.*))?$",
+            RegexOptions.IgnoreCase
+        );
+        if (receiveMatch.Success)
+        {
+            var rawVal = receiveMatch.Groups[1].Value.Replace(',', '.');
+            if (decimal.TryParse(rawVal, NumberStyles.Any, CultureInfo.InvariantCulture, out var recAmount) && recAmount > 0)
+            {
+                var cleanDesc = receiveMatch.Groups[2].Success ? receiveMatch.Groups[2].Value.Trim() : "";
+                while (Regex.IsMatch(cleanDesc, @"^(?:no\s+pix|pelo\s+pix|do\s+pix|pix|de\s+reembolso|reembolso|de|do|da|com|em|para|pro)\s+", RegexOptions.IgnoreCase))
+                {
+                    cleanDesc = Regex.Replace(cleanDesc, @"^(?:no\s+pix|pelo\s+pix|do\s+pix|pix|de\s+reembolso|reembolso|de|do|da|com|em|para|pro)\s+", "", RegexOptions.IgnoreCase).Trim();
+                }
+
+                if (string.IsNullOrWhiteSpace(cleanDesc))
+                {
+                    cleanDesc = "Pix Recebido";
+                }
+                else
+                {
+                    cleanDesc = "Pix " + (char.ToUpperInvariant(cleanDesc[0]) + cleanDesc.Substring(1));
+                }
+
+                return new ParsedExpenseIntent
+                {
+                    Intent = "RECEIVE_PIX",
+                    Amount = recAmount,
+                    Description = cleanDesc,
+                    Category = "Entrada",
+                    PaymentMethod = "PIX_INFLOW"
+                };
+            }
+        }
+
         // 5. Simulate command: "simular 400 4x", "/simular 500 em 3x", "simular 150"
         var simMatch = Regex.Match(text, @"^(?:/|)?simular\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(?:em\s+)?([0-9]{1,2})x?)?", RegexOptions.IgnoreCase);
         if (simMatch.Success)

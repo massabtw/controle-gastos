@@ -58,6 +58,19 @@ public class ExpensesController : ControllerBase
         return StatusCode(201, created);
     }
 
+    [HttpPost("receive-pix")]
+    public async Task<IActionResult> ReceivePix([FromBody] ReceivePixInflowDto dto)
+    {
+        if (dto.Amount <= 0)
+            return BadRequest(new { message = "Amount must be greater than zero." });
+
+        if (string.IsNullOrWhiteSpace(dto.Description))
+            return BadRequest(new { message = "Description is required." });
+
+        var created = await _expenseService.ReceivePixInflowAsync(dto);
+        return StatusCode(201, created);
+    }
+
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateExpense(int id, [FromBody] UpdateExpenseDto dto)
     {

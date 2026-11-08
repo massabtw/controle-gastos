@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeaderProps {
@@ -10,6 +10,7 @@ interface HeaderProps {
   onCycleChange: (cycle: string) => void;
   onOpenNewExpense: () => void;
   onOpenPixCaixinha?: () => void;
+  onOpenReceivePix?: () => void;
   onOpenSyncInvoice?: () => void;
   onOpenSettings: () => void;
 }
@@ -20,6 +21,7 @@ export function Header({
   onCycleChange,
   onOpenNewExpense,
   onOpenPixCaixinha,
+  onOpenReceivePix,
   onOpenSyncInvoice,
   onOpenSettings,
 }: HeaderProps) {
@@ -125,11 +127,22 @@ export function Header({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
+        {onOpenReceivePix && (
+          <button
+            onClick={onOpenReceivePix}
+            title="Registrar recebimento de Pix (vai diretamente para a Caixinha Nubank)"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
+          >
+            <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+            <span className="hidden sm:inline">Pix Recebido</span>
+          </button>
+        )}
+
         {onOpenPixCaixinha && (
           <button
             onClick={onOpenPixCaixinha}
             title="Retirar dinheiro da Caixinha para pagar no Pix"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-200 text-xs sm:text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
           >
             <Send className="w-4 h-4 text-cyan-400" />
             <span className="hidden sm:inline">Retirar p/ Pix</span>

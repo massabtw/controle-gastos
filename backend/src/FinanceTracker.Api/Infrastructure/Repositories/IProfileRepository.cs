@@ -7,6 +7,7 @@ public interface IProfileRepository
     Task<FinancialProfile> GetProfileAsync();
     Task<bool> UpdateProfileAsync(FinancialProfile profile);
     Task<bool> UpdateCaixinhaBalanceAsync(decimal balance);
+    Task<decimal> DepositCaixinhaAsync(decimal amount);
     Task<bool> UpdateCardLimitAsync(decimal creditCardLimit, decimal? customCardCap);
     Task<bool> MarkCommitmentPaidFromCaixinhaAsync(int id, string cycle);
     Task<(bool success, bool isPaid, decimal balanceAfter)> ToggleCommitmentPaidAsync(int id, string cycle);

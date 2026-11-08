@@ -15,6 +15,7 @@ public interface IExpenseService
     Task<string> UndoLatestExpenseAsync();
     Task<decimal> SyncInvoiceTotalAsync(decimal targetTotal, string? cycle = null);
     Task<CardExpense> CreatePixCaixinhaExpenseAsync(CreatePixCaixinhaDto dto);
+    Task<CardExpense> ReceivePixInflowAsync(ReceivePixInflowDto dto);
 }
 
 public class ExpenseService : IExpenseService
@@ -200,6 +201,12 @@ public class ExpenseService : IExpenseService
             var profile = await _profileRepository.GetProfileAsync();
             await _profileRepository.UpdateCaixinhaBalanceAsync(profile.NubankCaixinhaBalance + existing.Amount);
         }
+        else if (existing.PaymentMethod == "PIX_INFLOW")
+        {
+            var profile = await _profileRepository.GetProfileAsync();
+            var newBalance = Math.Max(0m, profile.NubankCaixinhaBalance - existing.Amount);
+            await _profileRepository.UpdateCaixinhaBalanceAsync(newBalance);
+        }
 
         if (deleteAllInstallments && existing.PurchaseGroupId.HasValue)
         {
@@ -224,6 +231,15 @@ public class ExpenseService : IExpenseService
             return $"Desfeito com sucesso: Pix da Caixinha '{latest.Description}' (R$ {latest.Amount:F2}) estornado para a Caixinha.";
         }
 
+        if (latest.PaymentMethod == "PIX_INFLOW")
+        {
+            var profile = await _profileRepository.GetProfileAsync();
+            var newBalance = Math.Max(0m, profile.NubankCaixinhaBalance - latest.Amount);
+            await _profileRepository.UpdateCaixinhaBalanceAsync(newBalance);
+            await _expenseRepository.DeleteExpenseAsync(latest.Id);
+            return $"Desfeito com sucesso: Pix Recebido '{latest.Description}' (R$ {latest.Amount:F2}) removido da Caixinha.";
+        }
+
         if (latest.PurchaseGroupId.HasValue)
         {
             var group = (await _expenseRepository.GetExpensesByGroupIdAsync(latest.PurchaseGroupId.Value)).ToList();
@@ -239,6 +255,33 @@ public class ExpenseService : IExpenseService
             await _expenseRepository.DeleteExpenseAsync(latest.Id);
             return $"Desfeito com sucesso: Gasto '{latest.Description}' (R$ {latest.Amount:F2}).";
         }
+    }
+
+    public async Task<CardExpense> ReceivePixInflowAsync(ReceivePixInflowDto dto)
+    {
+        var profile = await _profileRepository.GetProfileAsync();
+        await _profileRepository.DepositCaixinhaAsync(dto.Amount);
+
+        var txDate = dto.TransactionDate ?? DateTime.Now;
+        var targetCycle = BillingCycleCalculator.GetTargetBillingCycle(txDate, profile.ClosingDay);
+
+        var expense = new CardExpense
+        {
+            Description = string.IsNullOrWhiteSpace(dto.Description) ? "Pix Recebido" : dto.Description.Trim(),
+            Category = string.IsNullOrWhiteSpace(dto.Category) ? "Entrada" : dto.Category.Trim(),
+            Amount = dto.Amount,
+            TransactionDate = txDate,
+            BillingCycle = targetCycle,
+            InstallmentCurrent = 1,
+            InstallmentTotal = 1,
+            PurchaseGroupId = null,
+            PaymentMethod = "PIX_INFLOW",
+            DeductFromCycleCap = false
+        };
+
+        var id = await _expenseRepository.AddExpenseAsync(expense);
+        expense.Id = id;
+        return expense;
     }
 
     public async Task<CardExpense> CreatePixCaixinhaExpenseAsync(CreatePixCaixinhaDto dto)

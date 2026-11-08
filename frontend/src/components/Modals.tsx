@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Trash2, Settings2, CreditCard, PiggyBank, Send, RefreshCw, Sliders, Plus } from 'lucide-react';
+import { X, Trash2, Settings2, CreditCard, PiggyBank, Send, RefreshCw, Sliders, Plus, ArrowDownLeft } from 'lucide-react';
 import { api, CardExpense, FinancialProfile, FixedCommitment } from '@/lib/api';
 
 const CATEGORIES = ['Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'];
@@ -1818,6 +1818,395 @@ export function NewSubscriptionModal({
             >
               <Plus className="w-3.5 h-3.5" />
               {loading ? 'Adicionando...' : 'Cadastrar Assinatura'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// 9. DEPOSIT CAIXINHA MODAL (Adicionar Valor na Caixinha)
+interface DepositCaixinhaModalProps {
+  isOpen: boolean;
+  currentBalance: number;
+  cdiAnnualRate: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function DepositCaixinhaModal({
+  isOpen,
+  currentBalance,
+  cdiAnnualRate,
+  onClose,
+  onSuccess,
+}: DepositCaixinhaModalProps) {
+  const [amountStr, setAmountStr] = useState('');
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAmountStr('');
+      setDescription('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const amount = parseFloat(amountStr.replace(',', '.')) || 0;
+  const newBalance = currentBalance + amount;
+  const effectiveAnnual = cdiAnnualRate * 1.15;
+  const newMonthlyYield = newBalance * ((effectiveAnnual / 100) / 12);
+  const newDailyYield = newMonthlyYield / 30;
+
+  const handlePreset = (val: number) => {
+    const current = parseFloat(amountStr.replace(',', '.')) || 0;
+    setAmountStr((current + val).toFixed(2));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isNaN(amount) || amount <= 0) return;
+
+    setLoading(true);
+    try {
+      await api.depositCaixinha(amount, description.trim() || undefined);
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao adicionar valor na Caixinha';
+      alert(`Erro: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+              <PiggyBank className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-100">Adicionar à Caixinha Nubank</h3>
+              <span className="text-[10px] font-mono text-purple-400">Rendimento a 115% do CDI</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Adicione qualquer valor para aumentar seu saldo na Caixinha. O valor adicionado rende imediatamente 115% do CDI.
+          </p>
+
+          {/* Quick Presets */}
+          <div>
+            <label className="block text-xs font-semibold text-zinc-400 mb-1.5">
+              Adição Rápida:
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[10, 20, 50, 100].map((val) => (
+                <button
+                  type="button"
+                  key={val}
+                  onClick={() => handlePreset(val)}
+                  className="py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-all cursor-pointer"
+                >
+                  +R$ {val}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              Valor a Guardar (R$)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                R$
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                placeholder="0,00"
+                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-3 text-lg font-mono font-bold text-purple-300 focus:outline-none focus:border-purple-500/60"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              Motivo / Descrição (Opcional)
+            </label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ex: Sobra da semana, Depósito extra"
+              className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/60"
+            />
+          </div>
+
+          {/* Impact preview */}
+          <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-xs space-y-2">
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Saldo Atual:</span>
+              <span className="font-mono text-zinc-300">R$ {currentBalance.toFixed(2)}</span>
+            </div>
+            {amount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-purple-300 font-semibold">
+                  <span>+ Valor a Adicionar:</span>
+                  <span className="font-mono">+ R$ {amount.toFixed(2)}</span>
+                </div>
+                <div className="pt-2 border-t border-zinc-800 flex items-center justify-between font-bold text-zinc-100">
+                  <span>Novo Saldo:</span>
+                  <span className="font-mono text-purple-300 text-sm">
+                    R$ {newBalance.toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-[11px] font-mono text-emerald-400 flex items-center justify-between pt-1">
+                  <span>Novo rendimento estimado:</span>
+                  <span>+R$ {newMonthlyYield.toFixed(2)}/mês (+R$ {newDailyYield.toFixed(2)}/dia)</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || amount <= 0}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {loading ? 'Adicionando...' : `Adicionar R$ ${amount.toFixed(2)}`}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// 10. RECEIVE PIX MODAL (Receber Pix Externo / Reembolso -> Direto pra Caixinha)
+interface ReceivePixModalProps {
+  isOpen: boolean;
+  currentBalance: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function ReceivePixModal({
+  isOpen,
+  currentBalance,
+  onClose,
+  onSuccess,
+}: ReceivePixModalProps) {
+  const [description, setDescription] = useState('');
+  const [amountStr, setAmountStr] = useState('');
+  const [category, setCategory] = useState('Entrada');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setDescription('');
+      setAmountStr('');
+      setCategory('Entrada');
+      setDate(new Date().toISOString().split('T')[0]);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const amount = parseFloat(amountStr.replace(',', '.')) || 0;
+  const newBalance = currentBalance + amount;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isNaN(amount) || amount <= 0 || !description.trim()) return;
+
+    setLoading(true);
+    try {
+      await api.receivePix({
+        description: description.trim(),
+        amount,
+        category: category.trim() || 'Entrada',
+        transactionDate: date ? new Date(date).toISOString() : undefined,
+      });
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao registrar Pix recebido';
+      alert(`Erro: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+              <ArrowDownLeft className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-100">Receber Pix / Reembolso</h3>
+              <span className="text-[10px] font-mono text-emerald-400">
+                Vai automaticamente para a Caixinha (115% CDI) 🐷
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="p-3 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-xs text-emerald-300 leading-relaxed flex items-start gap-2">
+            <PiggyBank className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <span>
+              Pagou algo para alguém e a pessoa te fez um Pix de volta? Registre aqui e o dinheiro será automaticamente guardado na sua Caixinha do Nubank!
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              De quem / Motivo
+            </label>
+            <input
+              type="text"
+              required
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Ex: Pix do João almoço, Reembolso Pedro"
+              className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/60"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              Valor Recebido (R$)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                R$
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={amountStr}
+                onChange={(e) => setAmountStr(e.target.value)}
+                placeholder="0,00"
+                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-3 text-lg font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500/60"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+                Categoria
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/60"
+              >
+                <option value="Entrada">Entrada / Reembolso</option>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Lazer">Lazer</option>
+                <option value="Compras">Compras</option>
+                <option value="Outros">Outros</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+                Data do Pix
+              </label>
+              <input
+                type="date"
+                required
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/60"
+              />
+            </div>
+          </div>
+
+          {/* Impact preview */}
+          <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 text-xs space-y-1.5">
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Saldo Atual da Caixinha:</span>
+              <span className="font-mono text-zinc-300">R$ {currentBalance.toFixed(2)}</span>
+            </div>
+            {amount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-emerald-400 font-semibold">
+                  <span>+ Pix Recebido:</span>
+                  <span className="font-mono">+ R$ {amount.toFixed(2)}</span>
+                </div>
+                <div className="pt-1.5 border-t border-zinc-800 flex items-center justify-between font-bold text-zinc-100">
+                  <span>Novo Saldo Caixinha:</span>
+                  <span className="font-mono text-emerald-400 text-sm">
+                    R$ {newBalance.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || amount <= 0 || !description.trim()}
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowDownLeft className="w-3.5 h-3.5" />
+              {loading ? 'Registrando...' : `Confirmar Pix (+ R$ ${amount.toFixed(2)})`}
             </button>
           </div>
         </form>
