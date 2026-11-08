@@ -1,0 +1,272 @@
+'use client';
+
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
+import { DashboardSummary } from '@/lib/api';
+
+interface HeroBentoGridProps {
+  summary: DashboardSummary | null;
+}
+
+export function HeroBentoGrid({ summary }: HeroBentoGridProps) {
+  if (!summary) return null;
+
+  const isWarning = summary.status === 'WARNING';
+  const isCritical = summary.status === 'INVADING_INVESTMENT';
+
+  // Percentage of card hard cap consumed
+  const capConsumedPct = summary.cardHardCap > 0
+    ? Math.min(100, Math.max(0, (summary.currentInvoiceTotal / summary.cardHardCap) * 100))
+    : 100;
+
+  return (
+    <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+      {/* CARD 1: NORTH STAR - DAILY BURN RATE (5 cols) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className={`lg:col-span-5 relative overflow-hidden rounded-3xl border p-6 flex flex-col justify-between shadow-xl backdrop-blur-md ${
+          isCritical
+            ? 'bg-rose-950/20 border-rose-500/40 text-rose-100 shadow-rose-950/30'
+            : isWarning
+            ? 'bg-amber-950/20 border-amber-500/40 text-amber-100 shadow-amber-950/30'
+            : 'bg-zinc-900/80 border-emerald-500/30 text-zinc-100 shadow-emerald-950/20'
+        }`}
+      >
+        {/* Subtle background glow */}
+        <div
+          className={`absolute -right-12 -top-12 w-44 h-44 rounded-full blur-3xl opacity-20 pointer-events-none ${
+            isCritical ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
+          }`}
+        />
+
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div
+                className={`p-2 rounded-xl ${
+                  isCritical
+                    ? 'bg-rose-500/20 text-rose-400'
+                    : isWarning
+                    ? 'bg-amber-500/20 text-amber-400'
+                    : 'bg-emerald-500/20 text-emerald-400'
+                }`}
+              >
+                <Flame className="w-5 h-5 fill-current" />
+              </div>
+              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400">
+                Limite Diário (Burn Rate)
+              </span>
+            </div>
+
+            <span
+              className={`text-[11px] font-mono px-2.5 py-1 rounded-full border flex items-center gap-1.5 font-semibold ${
+                isCritical
+                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                  : isWarning
+                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+              }`}
+            >
+              {isCritical ? (
+                <>
+                  <AlertTriangle className="w-3 h-3" /> Meta Invadida
+                </>
+              ) : isWarning ? (
+                <>
+                  <AlertTriangle className="w-3 h-3" /> Atenção &lt; R$ 20/d
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-3 h-3" /> Ritmo Seguro
+                </>
+              )}
+            </span>
+          </div>
+
+          <div className="my-3">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xs sm:text-sm text-zinc-400 font-medium">R$</span>
+              <span
+                className={`text-4xl sm:text-5xl font-black tracking-tight font-mono ${
+                  isCritical ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
+                }`}
+              >
+                {summary.availablePerDay.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              <span className="text-sm sm:text-base text-zinc-400 font-medium">/ dia</span>
+            </div>
+
+            <p className="text-xs text-zinc-400 mt-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-zinc-500 animate-ping" />
+              <span>
+                {summary.daysUntilClosing > 0
+                  ? `${summary.daysUntilClosing} dias restantes até o fechamento (dia 08)`
+                  : 'Fatura fechada'}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Footer info inside Card 1 */}
+        <div className="pt-4 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+          <span className="text-zinc-400">Saldo restante no teto:</span>
+          <span
+            className={`font-mono font-bold text-sm ${
+              summary.remainingBudget < 0 ? 'text-rose-400' : 'text-zinc-100'
+            }`}
+          >
+            R${' '}
+            {summary.remainingBudget.toLocaleString('pt-BR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        </div>
+      </motion.div>
+
+      {/* CARD 2: HARD CAP PROGRESS & EQUATION BREAKDOWN (4 cols) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.1 }}
+        className="lg:col-span-4 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 flex flex-col justify-between shadow-xl backdrop-blur-md"
+      >
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                <Shield className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400">
+                Teto do Cartão
+              </span>
+            </div>
+            <span className="text-xs font-mono font-bold text-zinc-300">
+              {capConsumedPct.toFixed(0)}% Usado
+            </span>
+          </div>
+
+          <div className="my-2">
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="text-2xl font-bold font-mono text-zinc-100">
+                R${' '}
+                {summary.currentInvoiceTotal.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              <span className="text-xs font-mono text-zinc-400">
+                de R${' '}
+                {summary.cardHardCap.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden p-0.5">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${capConsumedPct}%` }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className={`h-full rounded-full ${
+                  capConsumedPct > 90
+                    ? 'bg-rose-500'
+                    : capConsumedPct > 70
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* Visual Equation Formula */}
+          <div className="mt-4 p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-[11px] leading-relaxed">
+            <div className="text-zinc-400 font-semibold mb-1 flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              Fórmula do Teto Mensal:
+            </div>
+            <div className="font-mono text-zinc-300 flex items-center flex-wrap gap-1">
+              <span>R$ {summary.totalIncome.toFixed(0)} (Renda)</span>
+              <span className="text-rose-400">− R$ 1.000 (Meta 🔒)</span>
+              <span className="text-blue-400">− R$ {summary.totalFixedCommitments.toFixed(0)} (Pix)</span>
+              <span>=</span>
+              <span className="text-emerald-400 font-bold">R$ {summary.cardHardCap.toFixed(0)} Teto</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Active fixed commitments list */}
+        <div className="pt-3 mt-3 border-t border-zinc-800/80 flex flex-wrap gap-1.5">
+          {summary.activeFixedCommitments.map((c) => (
+            <span
+              key={c.id}
+              className="text-[11px] font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-2 py-0.5 rounded-lg flex items-center gap-1"
+            >
+              <span className="text-zinc-400">{c.title}:</span>
+              <span className="font-mono font-medium">R$ {c.amount.toFixed(0)}</span>
+              <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1 rounded">
+                {c.badge}
+              </span>
+            </span>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* CARD 3: LUCRO FANTASMA - CDI YIELD (3 cols) */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+        className="lg:col-span-3 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 flex flex-col justify-between shadow-xl backdrop-blur-md"
+      >
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400">
+                Lucro Fantasma
+              </span>
+            </div>
+            <span className="text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full font-semibold">
+              CDI {summary.cdiAnnualRate}% a.a.
+            </span>
+          </div>
+
+          <div className="my-2">
+            <span className="text-xs text-zinc-400 block mb-1">Rendimento na conta até dia 16:</span>
+            <div className="flex items-baseline gap-1 text-purple-400">
+              <span className="text-xs font-medium">R$</span>
+              <span className="text-3xl font-black font-mono tracking-tight">
+                +{summary.phantomYieldEstimate.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-zinc-400 leading-relaxed mt-2">
+            Deixar o dinheiro da fatura rendendo no CDI até o vencimento (dia 16) gera rendimento passivo sem risco.
+          </p>
+        </div>
+
+        <div className="pt-3 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+          <span className="text-zinc-400">Potencial teto cheio:</span>
+          <span className="font-mono font-bold text-purple-400">
+            +R$ {summary.phantomYieldFullCap.toFixed(2)}/mês
+          </span>
+        </div>
+      </motion.div>
+    </section>
+  );
+}

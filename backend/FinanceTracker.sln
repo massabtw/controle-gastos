@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6387FABC-C6CB-4CEC-B2AA-32C1CE314A6D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinanceTracker.Api", "src\FinanceTracker.Api\FinanceTracker.Api.csproj", "{461099CC-0C07-47B0-85E9-1AE5DF67B160}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{AA7F582D-910A-425B-93D4-BB1F0CCC9125}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinanceTracker.Tests", "tests\FinanceTracker.Tests\FinanceTracker.Tests.csproj", "{394468AA-9B0F-423B-88FB-5989908EA295}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{461099CC-0C07-47B0-85E9-1AE5DF67B160}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{461099CC-0C07-47B0-85E9-1AE5DF67B160}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{461099CC-0C07-47B0-85E9-1AE5DF67B160}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{461099CC-0C07-47B0-85E9-1AE5DF67B160}.Release|Any CPU.Build.0 = Release|Any CPU
+		{394468AA-9B0F-423B-88FB-5989908EA295}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{394468AA-9B0F-423B-88FB-5989908EA295}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{394468AA-9B0F-423B-88FB-5989908EA295}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{394468AA-9B0F-423B-88FB-5989908EA295}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{461099CC-0C07-47B0-85E9-1AE5DF67B160} = {6387FABC-C6CB-4CEC-B2AA-32C1CE314A6D}
+		{394468AA-9B0F-423B-88FB-5989908EA295} = {AA7F582D-910A-425B-93D4-BB1F0CCC9125}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,135 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+
+namespace FinanceTracker.Api.Services.Ai;
+
+public static class RegexExpenseParser
+{
+    private static readonly CultureInfo PtBrCulture = new("pt-BR");
+
+    public static ParsedExpenseIntent Parse(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return new ParsedExpenseIntent { Intent = "UNKNOWN" };
+        }
+
+        var text = input.Trim().ToLowerInvariant();
+
+        // 1. Status command
+        if (text == "status" || text == "/status")
+        {
+            return new ParsedExpenseIntent { Intent = "STATUS" };
+        }
+
+        // 2. Undo command
+        if (text == "desfazer" || text == "/desfazer" || text == "apagar ultimo" || text == "desfazer ultimo")
+        {
+            return new ParsedExpenseIntent { Intent = "UNDO" };
+        }
+
+        // 3. Simulate command: "simular 400 4x", "/simular 500 em 3x", "simular 150"
+        var simMatch = Regex.Match(text, @"^(?:/|)?simular\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(?:em\s+)?([0-9]{1,2})x?)?", RegexOptions.IgnoreCase);
+        if (simMatch.Success)
+        {
+            var amountStr = simMatch.Groups[1].Value.Replace(',', '.');
+            if (decimal.TryParse(amountStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var simAmount))
+            {
+                var installments = 1;
+                if (simMatch.Groups[2].Success && int.TryParse(simMatch.Groups[2].Value, out var inst))
+                {
+                    installments = Math.Max(1, inst);
+                }
+
+                return new ParsedExpenseIntent
+                {
+                    Intent = "SIMULATE",
+                    Amount = simAmount,
+                    Installments = installments,
+                    Description = "Simulação"
+                };
+            }
+        }
+
+        // 4. Relative dates (e.g., "ontem")
+        DateTime? targetDate = null;
+        if (text.Contains("ontem"))
+        {
+            targetDate = DateTime.Now.AddDays(-1);
+            text = text.Replace("ontem", "").Trim();
+        }
+
+        // 5. Add Expense parsing
+        // Matches patterns like:
+        // "uber 25", "uber 24,90", "comprei jogo 150 em 3x", "teclado 300 3x", "almoço 45.00"
+        var expenseRegex = new Regex(
+            @"(?<desc>[\p{L}\p{N}\s\-]+?)\s+(?:r\$\s*)?(?<amount>[0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(?:em\s+)?(?<inst>[0-9]{1,2})x)?$",
+            RegexOptions.IgnoreCase
+        );
+
+        var match = expenseRegex.Match(text);
+        if (match.Success)
+        {
+            var rawDesc = match.Groups["desc"].Value.Trim();
+            var rawAmount = match.Groups["amount"].Value.Replace(',', '.');
+            var rawInst = match.Groups["inst"].Value;
+
+            if (decimal.TryParse(rawAmount, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount) && amount > 0)
+            {
+                var installments = 1;
+                if (!string.IsNullOrEmpty(rawInst) && int.TryParse(rawInst, out var instVal))
+                {
+                    installments = Math.Max(1, instVal);
+                }
+
+                // Clean description prefixes like "comprei um", "paguei", etc.
+                var cleanDesc = Regex.Replace(rawDesc, @"^(comprei(?:\s+um|\s+uma)?|paguei(?:\s+o|\s+a)?|gastei\s+com|gastei)\s+", "", RegexOptions.IgnoreCase).Trim();
+                if (string.IsNullOrWhiteSpace(cleanDesc))
+                {
+                    cleanDesc = "Despesa";
+                }
+
+                cleanDesc = char.ToUpperInvariant(cleanDesc[0]) + cleanDesc.Substring(1);
+
+                var category = InferCategory(cleanDesc);
+
+                return new ParsedExpenseIntent
+                {
+                    Intent = "ADD_EXPENSE",
+                    Description = cleanDesc,
+                    Amount = amount,
+                    Installments = installments,
+                    Category = category,
+                    TransactionDate = targetDate
+                };
+            }
+        }
+
+        return new ParsedExpenseIntent { Intent = "UNKNOWN" };
+    }
+
+    public static string InferCategory(string description)
+    {
+        var d = description.ToLowerInvariant();
+
+        if (Regex.IsMatch(d, @"\b(uber|99|taxi|onibus|ônibus|metro|metrô|gasolina|combustivel|combustível|estacionamento|pedagio|pedágio)\b"))
+            return "Transporte";
+
+        if (Regex.IsMatch(d, @"\b(almoço|almoco|jantar|lanche|ifood|rappi|mercado|supermercado|pizza|hamburguer|padaria|restaurante|cafe|café|comida|açougue)\b"))
+            return "Alimentação";
+
+        if (Regex.IsMatch(d, @"\b(cinema|jogo|jogos|steam|playstation|xbox|bar|cerveja|balada|show|teatro|festa|lazer|viagem)\b"))
+            return "Lazer";
+
+        if (Regex.IsMatch(d, @"\b(netflix|spotify|amazon\s*prime|youtube|gympass|smartfit|apple|disney|hbo|max|assinatura)\b"))
+            return "Assinaturas";
+
+        if (Regex.IsMatch(d, @"\b(farmacia|farmácia|remedio|remédio|medico|médico|consulta|exame|dentista)\b"))
+            return "Saúde";
+
+        if (Regex.IsMatch(d, @"\b(roupa|tenis|tênis|livro|eletronico|teclado|mouse|monitor|shopee|aliexpress|mercado\s*livre|amazon)\b"))
+            return "Compras";
+
+        return "Outros";
+    }
+}
