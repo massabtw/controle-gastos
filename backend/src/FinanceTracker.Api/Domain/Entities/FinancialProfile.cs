@@ -10,5 +10,12 @@ public class FinancialProfile
     public int DueDay { get; set; } = 16;
     public decimal CdiAnnualRate { get; set; } = 11.25m;
 
+    public decimal NubankCaixinhaBalance { get; set; } = 0.00m;
+    public decimal NubankCaixinhaCdiRate { get; set; } = 115.00m;
+
+    public string? GroqApiKey { get; set; }
+    public string? TelegramBotToken { get; set; }
+    public long? TelegramAllowedChatId { get; set; }
+
     public decimal TotalIncome => IncomeFirstTranche + IncomeSecondTranche;
 }

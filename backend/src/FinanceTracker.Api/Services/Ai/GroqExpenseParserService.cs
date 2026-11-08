@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using FinanceTracker.Api.Infrastructure.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -15,12 +16,18 @@ public class GroqExpenseParserService : IGroqExpenseParserService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly IProfileRepository _profileRepository;
     private readonly ILogger<GroqExpenseParserService> _logger;
 
-    public GroqExpenseParserService(HttpClient httpClient, IConfiguration configuration, ILogger<GroqExpenseParserService> logger)
+    public GroqExpenseParserService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        IProfileRepository profileRepository,
+        ILogger<GroqExpenseParserService> logger)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _profileRepository = profileRepository;
         _logger = logger;
     }
 
@@ -31,7 +38,11 @@ public class GroqExpenseParserService : IGroqExpenseParserService
             return new ParsedExpenseIntent { Intent = "UNKNOWN" };
         }
 
-        var apiKey = _configuration["Groq:ApiKey"];
+        var profile = await _profileRepository.GetProfileAsync();
+        var apiKey = !string.IsNullOrWhiteSpace(profile?.GroqApiKey)
+            ? profile.GroqApiKey
+            : _configuration["Groq:ApiKey"];
+
         var model = _configuration["Groq:Model"] ?? "llama-3.3-70b-versatile";
 
         // Fallback directly if no API key is provided

@@ -2,14 +2,15 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
+import { Flame, Shield, TrendingUp, AlertTriangle, ShieldCheck, Zap, PiggyBank, Edit3 } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeroBentoGridProps {
   summary: DashboardSummary | null;
+  onOpenUpdateCaixinha?: () => void;
 }
 
-export function HeroBentoGrid({ summary }: HeroBentoGridProps) {
+export function HeroBentoGrid({ summary, onOpenUpdateCaixinha }: HeroBentoGridProps) {
   if (!summary) return null;
 
   const isWarning = summary.status === 'WARNING';
@@ -220,50 +221,79 @@ export function HeroBentoGrid({ summary }: HeroBentoGridProps) {
         </div>
       </motion.div>
 
-      {/* CARD 3: LUCRO FANTASMA - CDI YIELD (3 cols) */}
+      {/* CARD 3: CAIXINHA NUBANK (115% CDI) & LUCRO FANTASMA (4 cols) */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.2 }}
-        className="lg:col-span-3 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 flex flex-col justify-between shadow-xl backdrop-blur-md"
+        className="lg:col-span-3 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-5 flex flex-col justify-between shadow-xl backdrop-blur-md"
       >
         <div>
-          <div className="flex items-center justify-between mb-4">
+          {/* Nubank Caixinha Header */}
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400">
-                <TrendingUp className="w-5 h-5" />
+              <div className="p-1.5 rounded-xl bg-purple-500/20 text-purple-400">
+                <PiggyBank className="w-4 h-4" />
               </div>
-              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400">
-                Lucro Fantasma
+              <span className="text-xs font-semibold tracking-wider uppercase text-zinc-300">
+                Caixinha Nubank
               </span>
             </div>
-            <span className="text-[10px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-full font-semibold">
-              CDI {summary.cdiAnnualRate}% a.a.
+            <span className="text-[10px] font-mono bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-full font-bold">
+              115% CDI
             </span>
           </div>
 
-          <div className="my-2">
-            <span className="text-xs text-zinc-400 block mb-1">Rendimento na conta até dia 16:</span>
-            <div className="flex items-baseline gap-1 text-purple-400">
-              <span className="text-xs font-medium">R$</span>
-              <span className="text-3xl font-black font-mono tracking-tight">
-                +{summary.phantomYieldEstimate.toLocaleString('pt-BR', {
+          {/* Balance & Edit Button */}
+          <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 mb-3">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-0.5">
+              <span>Saldo Investido:</span>
+              {onOpenUpdateCaixinha && (
+                <button
+                  onClick={onOpenUpdateCaixinha}
+                  className="flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 hover:underline"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>Ajustar</span>
+                </button>
+              )}
+            </div>
+            <div className="flex items-baseline gap-1 text-purple-300 font-mono">
+              <span className="text-xs">R$</span>
+              <span className="text-2xl font-black tracking-tight">
+                {summary.nubankCaixinhaBalance.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
             </div>
+            <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono mt-1 pt-1 border-t border-zinc-800/60">
+              <span>Rende: +R$ {summary.nubankCaixinhaMonthlyYield.toFixed(2)}/mês</span>
+              <span className="text-emerald-400 font-medium">(+R$ {summary.nubankCaixinhaDailyYield.toFixed(2)}/dia)</span>
+            </div>
           </div>
 
-          <p className="text-[11px] text-zinc-400 leading-relaxed mt-2">
-            Deixar o dinheiro da fatura rendendo no CDI até o vencimento (dia 16) gera rendimento passivo sem risco.
-          </p>
+          {/* Lucro Fantasma da Fatura */}
+          <div className="pt-2 border-t border-zinc-800/80">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+              <span className="flex items-center gap-1">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                Lucro Fantasma Fatura:
+              </span>
+              <span className="font-mono text-xs font-bold text-emerald-400">
+                +R$ {summary.phantomYieldEstimate.toFixed(2)}
+              </span>
+            </div>
+            <p className="text-[10px] text-zinc-500 leading-tight">
+              Dinheiro da fatura rendendo até dia 16 a {summary.cdiAnnualRate}% a.a.
+            </p>
+          </div>
         </div>
 
-        <div className="pt-3 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
-          <span className="text-zinc-400">Potencial teto cheio:</span>
-          <span className="font-mono font-bold text-purple-400">
-            +R$ {summary.phantomYieldFullCap.toFixed(2)}/mês
+        <div className="pt-2 mt-2 border-t border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400 font-mono">
+          <span>Taxa Efetiva:</span>
+          <span className="text-purple-300 font-bold">
+            {summary.nubankCaixinhaEffectiveAnnualRate}% a.a.
           </span>
         </div>
       </motion.div>

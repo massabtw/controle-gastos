@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Trash2, Settings2 } from 'lucide-react';
+import { X, Trash2, Settings2, CreditCard, PiggyBank } from 'lucide-react';
 import { api, CardExpense, FinancialProfile, FixedCommitment } from '@/lib/api';
 
 const CATEGORIES = ['Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'];
@@ -649,6 +649,35 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
               </div>
             </div>
 
+            {/* Nubank Caixinha settings */}
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-purple-950/20 border border-purple-500/20">
+              <div>
+                <label className="block text-xs font-semibold text-purple-300 uppercase tracking-wider mb-1">
+                  Saldo Caixinha Nubank (R$)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={profile.nubankCaixinhaBalance ?? 0}
+                  onChange={(e) => setProfile({ ...profile, nubankCaixinhaBalance: Number(e.target.value) })}
+                  className="w-full bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-purple-300 uppercase tracking-wider mb-1">
+                  Rendimento (% do CDI)
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  value={profile.nubankCaixinhaCdiRate ?? 115}
+                  onChange={(e) => setProfile({ ...profile, nubankCaixinhaCdiRate: Number(e.target.value) })}
+                  className="w-full bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                />
+              </div>
+            </div>
+
             <div className="pt-4 flex justify-end">
               <button
                 type="submit"
@@ -763,6 +792,278 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
             </form>
           </div>
         )}
+      </motion.div>
+    </div>
+  );
+}
+
+// 5. SYNC INVOICE MODAL (Ajustar Fatura Atual)
+interface SyncInvoiceModalProps {
+  isOpen: boolean;
+  currentTotal: number;
+  cycle: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function SyncInvoiceModal({
+  isOpen,
+  currentTotal,
+  cycle,
+  onClose,
+  onSuccess,
+}: SyncInvoiceModalProps) {
+  const [targetTotalStr, setTargetTotalStr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTargetTotalStr(currentTotal > 0 ? currentTotal.toFixed(2) : '');
+    }
+  }, [isOpen, currentTotal]);
+
+  if (!isOpen) return null;
+
+  const targetTotal = parseFloat(targetTotalStr.replace(',', '.')) || 0;
+  const diff = targetTotal - currentTotal;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isNaN(targetTotal) || targetTotal < 0) return;
+
+    setLoading(true);
+    try {
+      await api.syncInvoice(targetTotal, cycle);
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao sincronizar fatura';
+      alert(`Erro: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-100">Ajustar Fatura Atual</h3>
+              <span className="text-xs text-zinc-400 font-mono">Ciclo {cycle}</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Informe o valor exato exibido no app do Nubank agora. O sistema criará automaticamente uma linha de ajuste para calibrar o total sem que você precise lançar comprovantes antigos.
+          </p>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              Valor Real da Fatura no Nubank (R$)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                R$
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={targetTotalStr}
+                onChange={(e) => setTargetTotalStr(e.target.value)}
+                placeholder="Ex: 450.90"
+                className="w-full bg-zinc-950/70 border border-purple-500/50 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base text-zinc-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Difference Preview */}
+          <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800 text-xs font-mono space-y-1.5">
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Fatura computada atual:</span>
+              <span>R$ {currentTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-zinc-100 font-bold">
+              <span>Nova fatura no tracker:</span>
+              <span className="text-purple-300">R$ {targetTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-zinc-800 text-[11px]">
+              <span className="text-zinc-500">Ajuste gerado:</span>
+              <span className={diff >= 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                {diff >= 0 ? `+R$ ${diff.toFixed(2)}` : `-R$ ${Math.abs(diff).toFixed(2)}`}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+            >
+              {loading ? 'Sincronizando...' : 'Calibrar Fatura'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+// 6. UPDATE CAIXINHA MODAL (Nubank 115% CDI)
+interface UpdateCaixinhaModalProps {
+  isOpen: boolean;
+  currentBalance: number;
+  cdiAnnualRate: number;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function UpdateCaixinhaModal({
+  isOpen,
+  currentBalance,
+  cdiAnnualRate,
+  onClose,
+  onSuccess,
+}: UpdateCaixinhaModalProps) {
+  const [balanceStr, setBalanceStr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setBalanceStr(currentBalance > 0 ? currentBalance.toFixed(2) : '');
+    }
+  }, [isOpen, currentBalance]);
+
+  if (!isOpen) return null;
+
+  const balance = parseFloat(balanceStr.replace(',', '.')) || 0;
+  const effectiveAnnual = cdiAnnualRate * 1.15;
+  const monthlyYield = balance * ((effectiveAnnual / 100) / 12);
+  const dailyYield = monthlyYield / 30;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isNaN(balance) || balance < 0) return;
+
+    setLoading(true);
+    try {
+      await api.updateCaixinhaBalance(balance);
+      onSuccess();
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Falha ao atualizar saldo';
+      alert(`Erro: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+              <PiggyBank className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-zinc-100">Saldo da Caixinha Nubank</h3>
+              <span className="text-[10px] font-mono text-purple-400">Rendimento a 115% do CDI</span>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Atualize o valor total que você tem guardado na Caixinha do Nubank para acompanhar seu rendimento líquido mensal e diário.
+          </p>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">
+              Saldo Total Guardado (R$)
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono text-zinc-400">
+                R$
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                value={balanceStr}
+                onChange={(e) => setBalanceStr(e.target.value)}
+                placeholder="Ex: 5000.00"
+                className="w-full bg-zinc-950/70 border border-purple-500/50 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base text-zinc-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Live Yield Preview */}
+          <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800 text-xs font-mono space-y-1.5">
+            <div className="flex items-center justify-between text-zinc-400">
+              <span>Taxa efetiva anual:</span>
+              <span className="text-purple-300 font-bold">{effectiveAnnual.toFixed(2)}% a.a.</span>
+            </div>
+            <div className="flex items-center justify-between text-zinc-200">
+              <span>Rendimento estimado:</span>
+              <span className="text-emerald-400 font-bold">+R$ {monthlyYield.toFixed(2)} / mês</span>
+            </div>
+            <div className="flex items-center justify-between text-zinc-400 text-[11px]">
+              <span>Rendimento por dia:</span>
+              <span className="text-emerald-400">+R$ {dailyYield.toFixed(2)} / dia</span>
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+            >
+              {loading ? 'Salvando...' : 'Salvar Saldo'}
+            </button>
+          </div>
+        </form>
       </motion.div>
     </div>
   );

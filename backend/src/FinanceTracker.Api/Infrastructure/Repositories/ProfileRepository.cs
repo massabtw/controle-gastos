@@ -24,7 +24,12 @@ public class ProfileRepository : IProfileRepository
                 MonthlyInvestmentGoal, 
                 ClosingDay, 
                 DueDay, 
-                CdiAnnualRate
+                CdiAnnualRate,
+                NubankCaixinhaBalance,
+                NubankCaixinhaCdiRate,
+                GroqApiKey,
+                TelegramBotToken,
+                TelegramAllowedChatId
             FROM dbo.FinancialProfile
             ORDER BY Id ASC;";
 
@@ -49,10 +54,27 @@ public class ProfileRepository : IProfileRepository
                 MonthlyInvestmentGoal = @MonthlyInvestmentGoal,
                 ClosingDay = @ClosingDay,
                 DueDay = @DueDay,
-                CdiAnnualRate = @CdiAnnualRate
+                CdiAnnualRate = @CdiAnnualRate,
+                NubankCaixinhaBalance = @NubankCaixinhaBalance,
+                NubankCaixinhaCdiRate = @NubankCaixinhaCdiRate,
+                GroqApiKey = @GroqApiKey,
+                TelegramBotToken = @TelegramBotToken,
+                TelegramAllowedChatId = @TelegramAllowedChatId
             WHERE Id = @Id;";
 
         var affected = await connection.ExecuteAsync(sql, profile);
+        return affected > 0;
+    }
+
+    public async Task<bool> UpdateCaixinhaBalanceAsync(decimal balance)
+    {
+        using var connection = _connectionFactory.CreateConnection();
+        const string sql = @"
+            UPDATE dbo.FinancialProfile
+            SET NubankCaixinhaBalance = @Balance
+            WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);";
+
+        var affected = await connection.ExecuteAsync(sql, new { Balance = balance });
         return affected > 0;
     }
 

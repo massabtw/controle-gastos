@@ -33,6 +33,14 @@ export interface DashboardSummary {
   cdiAnnualRate: number;
   phantomYieldEstimate: number;
   phantomYieldFullCap: number;
+
+  // Nubank Caixinha (115% CDI) Tracker
+  nubankCaixinhaBalance: number;
+  nubankCaixinhaCdiRate: number;
+  nubankCaixinhaEffectiveAnnualRate: number;
+  nubankCaixinhaMonthlyYield: number;
+  nubankCaixinhaDailyYield: number;
+
   categoryBreakdown: CategoryBreakdown[];
 }
 
@@ -91,6 +99,8 @@ export interface FinancialProfile {
   closingDay: number;
   dueDay: number;
   cdiAnnualRate: number;
+  nubankCaixinhaBalance: number;
+  nubankCaixinhaCdiRate: number;
   totalIncome: number;
 }
 
@@ -167,6 +177,18 @@ export const api = {
   undoExpense: () =>
     request<{ message: string }>(`/api/expenses/undo`, {
       method: 'POST',
+    }),
+
+  syncInvoice: (targetTotal: number, cycle?: string) =>
+    request<{ message: string; currentInvoiceTotal: number }>(`/api/expenses/sync-invoice`, {
+      method: 'POST',
+      body: JSON.stringify({ targetTotal, cycle }),
+    }),
+
+  updateCaixinhaBalance: (balance: number) =>
+    request<{ message: string; balance: number }>(`/api/profile/caixinha`, {
+      method: 'POST',
+      body: JSON.stringify({ balance }),
     }),
 
   // Simulator

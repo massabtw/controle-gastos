@@ -90,6 +90,13 @@ public class FinancialEngineService : IFinancialEngineService
         var phantomYieldEstimate = Math.Round(currentInvoiceTotal * monthlyCdiRate, 2);
         var phantomYieldFullCap = Math.Round(Math.Max(0, cardHardCap) * monthlyCdiRate, 2);
 
+        // Nubank Caixinha (115% CDI) Yield
+        var caixinhaCdiRate = profile.NubankCaixinhaCdiRate > 0 ? profile.NubankCaixinhaCdiRate : 115.00m;
+        var caixinhaEffectiveAnnual = Math.Round(profile.CdiAnnualRate * (caixinhaCdiRate / 100m), 2);
+        var caixinhaMonthlyRate = (caixinhaEffectiveAnnual / 100m) / 12m;
+        var caixinhaMonthlyYield = Math.Round(profile.NubankCaixinhaBalance * caixinhaMonthlyRate, 2);
+        var caixinhaDailyYield = Math.Round(caixinhaMonthlyYield / 30m, 2);
+
         // Category breakdown
         var categoryGroups = expenses
             .GroupBy(e => string.IsNullOrWhiteSpace(e.Category) ? "Outros" : e.Category)
@@ -127,6 +134,12 @@ public class FinancialEngineService : IFinancialEngineService
             CdiAnnualRate = profile.CdiAnnualRate,
             PhantomYieldEstimate = phantomYieldEstimate,
             PhantomYieldFullCap = phantomYieldFullCap,
+
+            NubankCaixinhaBalance = profile.NubankCaixinhaBalance,
+            NubankCaixinhaCdiRate = caixinhaCdiRate,
+            NubankCaixinhaEffectiveAnnualRate = caixinhaEffectiveAnnual,
+            NubankCaixinhaMonthlyYield = caixinhaMonthlyYield,
+            NubankCaixinhaDailyYield = caixinhaDailyYield,
 
             CategoryBreakdown = categoryGroups
         };

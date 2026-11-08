@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   selectedCycle: string;
   onCycleChange: (cycle: string) => void;
   onOpenNewExpense: () => void;
+  onOpenSyncInvoice?: () => void;
   onOpenSettings: () => void;
 }
 
@@ -17,6 +18,7 @@ export function Header({
   selectedCycle,
   onCycleChange,
   onOpenNewExpense,
+  onOpenSyncInvoice,
   onOpenSettings,
 }: HeaderProps) {
   // Helper to step cycles
@@ -117,6 +119,17 @@ export function Header({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
+        {onOpenSyncInvoice && (
+          <button
+            onClick={onOpenSyncInvoice}
+            title="Ajustar fatura com base no app Nubank"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/40 text-purple-200 text-xs sm:text-sm font-medium transition-colors shadow-sm"
+          >
+            <CreditCard className="w-4 h-4 text-purple-400" />
+            <span className="hidden sm:inline">Ajustar Fatura</span>
+          </button>
+        )}
+
         <button
           onClick={onOpenSettings}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-sm font-medium transition-colors shadow-sm"

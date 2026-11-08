@@ -59,7 +59,25 @@ public class DashboardSummaryDto
     public decimal PhantomYieldEstimate { get; set; }
     public decimal PhantomYieldFullCap { get; set; }
 
+    // Nubank Caixinha (115% CDI) Tracker
+    public decimal NubankCaixinhaBalance { get; set; }
+    public decimal NubankCaixinhaCdiRate { get; set; }
+    public decimal NubankCaixinhaEffectiveAnnualRate { get; set; }
+    public decimal NubankCaixinhaMonthlyYield { get; set; }
+    public decimal NubankCaixinhaDailyYield { get; set; }
+
     public List<CategoryBreakdownDto> CategoryBreakdown { get; set; } = new();
+}
+
+public class SyncInvoiceDto
+{
+    public decimal TargetTotal { get; set; }
+    public string? Cycle { get; set; }
+}
+
+public class UpdateCaixinhaDto
+{
+    public decimal Balance { get; set; }
 }
 
 public class ProjectionCycleDto

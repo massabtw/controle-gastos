@@ -38,6 +38,19 @@ public class ProfileController : ControllerBase
         return Ok(new { message = "Profile updated successfully.", profile });
     }
 
+    [HttpPost("caixinha")]
+    public async Task<IActionResult> UpdateCaixinha([FromBody] Domain.Dtos.UpdateCaixinhaDto dto)
+    {
+        if (dto.Balance < 0)
+            return BadRequest(new { message = "Balance cannot be negative." });
+
+        var success = await _profileRepository.UpdateCaixinhaBalanceAsync(dto.Balance);
+        if (!success)
+            return BadRequest(new { message = "Could not update Caixinha balance." });
+
+        return Ok(new { message = "Caixinha balance updated successfully.", balance = dto.Balance });
+    }
+
     [HttpPost("commitments")]
     public async Task<IActionResult> AddCommitment([FromBody] FixedCommitment commitment)
     {

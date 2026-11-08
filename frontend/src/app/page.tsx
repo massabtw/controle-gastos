@@ -13,6 +13,8 @@ import {
   EditExpenseModal,
   DeleteConfirmModal,
   SettingsModal,
+  SyncInvoiceModal,
+  UpdateCaixinhaModal,
 } from '@/components/Modals';
 
 export default function Home() {
@@ -27,6 +29,8 @@ export default function Home() {
   const [editingExpense, setEditingExpense] = useState<CardExpense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState<CardExpense | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSyncInvoiceOpen, setIsSyncInvoiceOpen] = useState(false);
+  const [isUpdateCaixinhaOpen, setIsUpdateCaixinhaOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -74,6 +78,7 @@ export default function Home() {
           selectedCycle={selectedCycle || summary?.billingCycle || '...'}
           onCycleChange={handleCycleChange}
           onOpenNewExpense={() => setIsNewExpenseOpen(true)}
+          onOpenSyncInvoice={() => setIsSyncInvoiceOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
@@ -81,7 +86,10 @@ export default function Home() {
         <QuickCommandBar onRefresh={loadData} />
 
         {/* Core Hero Bento Grid */}
-        <HeroBentoGrid summary={summary} />
+        <HeroBentoGrid
+          summary={summary}
+          onOpenUpdateCaixinha={() => setIsUpdateCaixinhaOpen(true)}
+        />
 
         {/* Lack of Judgment Simulator */}
         <PurchaseSimulator summary={summary} />
@@ -127,6 +135,22 @@ export default function Home() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <SyncInvoiceModal
+        isOpen={isSyncInvoiceOpen}
+        currentTotal={summary?.currentInvoiceTotal ?? 0}
+        cycle={selectedCycle || summary?.billingCycle || ''}
+        onClose={() => setIsSyncInvoiceOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <UpdateCaixinhaModal
+        isOpen={isUpdateCaixinhaOpen}
+        currentBalance={summary?.nubankCaixinhaBalance ?? 0}
+        cdiAnnualRate={summary?.cdiAnnualRate ?? 11.25}
+        onClose={() => setIsUpdateCaixinhaOpen(false)}
         onSuccess={loadData}
       />
     </div>

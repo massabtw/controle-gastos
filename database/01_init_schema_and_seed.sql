@@ -22,7 +22,12 @@ BEGIN
         [MonthlyInvestmentGoal] DECIMAL(10,2) NOT NULL DEFAULT 1000.00,
         [ClosingDay] INT NOT NULL DEFAULT 8,
         [DueDay] INT NOT NULL DEFAULT 16,
-        [CdiAnnualRate] DECIMAL(5,2) NOT NULL DEFAULT 11.25
+        [CdiAnnualRate] DECIMAL(5,2) NOT NULL DEFAULT 11.25,
+        [NubankCaixinhaBalance] DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+        [NubankCaixinhaCdiRate] DECIMAL(5,2) NOT NULL DEFAULT 115.00,
+        [GroqApiKey] NVARCHAR(200) NULL,
+        [TelegramBotToken] NVARCHAR(200) NULL,
+        [TelegramAllowedChatId] BIGINT NULL
     );
 END
 GO

@@ -13,6 +13,7 @@ public interface IExpenseService
     Task<bool> UpdateExpenseAsync(int id, UpdateExpenseDto dto);
     Task<bool> DeleteExpenseAsync(int id, bool deleteAllInstallments = false);
     Task<string> UndoLatestExpenseAsync();
+    Task<decimal> SyncInvoiceTotalAsync(decimal targetTotal, string? cycle = null);
 }
 
 public class ExpenseService : IExpenseService
@@ -172,5 +173,37 @@ public class ExpenseService : IExpenseService
             await _expenseRepository.DeleteExpenseAsync(latest.Id);
             return $"Desfeito com sucesso: Gasto '{latest.Description}' (R$ {latest.Amount:F2}).";
         }
+    }
+
+    public async Task<decimal> SyncInvoiceTotalAsync(decimal targetTotal, string? cycle = null)
+    {
+        var profile = await _profileRepository.GetProfileAsync();
+        var targetCycle = string.IsNullOrWhiteSpace(cycle)
+            ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
+            : cycle;
+
+        var expenses = (await _expenseRepository.GetExpensesByCycleAsync(targetCycle)).ToList();
+        var currentTotal = expenses.Sum(e => e.Amount);
+        var diff = targetTotal - currentTotal;
+
+        if (Math.Abs(diff) < 0.01m)
+        {
+            return currentTotal;
+        }
+
+        var adjustment = new CardExpense
+        {
+            Description = diff > 0 ? "Ajuste de Fatura (Nubank)" : "Ajuste de Fatura (Crédito/Estorno)",
+            Category = "Outros",
+            Amount = diff,
+            TransactionDate = DateTime.Now,
+            BillingCycle = targetCycle,
+            InstallmentCurrent = 1,
+            InstallmentTotal = 1,
+            PurchaseGroupId = null
+        };
+
+        await _expenseRepository.AddExpenseAsync(adjustment);
+        return targetTotal;
     }
 }

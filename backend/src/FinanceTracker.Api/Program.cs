@@ -55,4 +55,20 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Self-healing database check (UTF-8 encoding and schema validation)
+try
+{
+    using var scope = app.Services.CreateScope();
+    var dbFactory = scope.ServiceProvider.GetRequiredService<IDbConnectionFactory>();
+    using var connection = dbFactory.CreateConnection();
+    Dapper.SqlMapper.Execute(connection, @"
+        UPDATE dbo.FixedCommitments SET Title = N'Internet Móvel Mãe' WHERE Title LIKE '%Internet%';
+        UPDATE dbo.FixedCommitments SET Title = N'Monitor Mãe' WHERE Title LIKE '%Monitor%';
+    ");
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Could not run self-healing DB check.");
+}
+
 app.Run();

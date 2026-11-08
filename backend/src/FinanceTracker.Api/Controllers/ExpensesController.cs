@@ -77,4 +77,14 @@ public class ExpensesController : ControllerBase
         var message = await _expenseService.UndoLatestExpenseAsync();
         return Ok(new { message });
     }
+
+    [HttpPost("sync-invoice")]
+    public async Task<IActionResult> SyncInvoice([FromBody] SyncInvoiceDto dto)
+    {
+        if (dto.TargetTotal < 0)
+            return BadRequest(new { message = "Target total cannot be negative." });
+
+        var newTotal = await _expenseService.SyncInvoiceTotalAsync(dto.TargetTotal, dto.Cycle);
+        return Ok(new { message = "Invoice synchronized successfully.", currentInvoiceTotal = newTotal });
+    }
 }
