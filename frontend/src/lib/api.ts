@@ -193,8 +193,13 @@ export const api = {
       body: JSON.stringify({ creditCardLimit, customCardCap }),
     }),
 
+  toggleCommitmentPaid: (id: number, cycle?: string) =>
+    request<{ message: string; isPaid: boolean; cycle: string; balanceAfter: number }>(`/api/commitments/${id}/toggle-paid${cycle ? `?cycle=${cycle}` : ''}`, {
+      method: 'POST',
+    }),
+
   payCommitmentFromCaixinha: (id: number, cycle?: string) =>
-    request<{ message: string; cycle: string }>(`/api/commitments/${id}/pay-from-caixinha${cycle ? `?cycle=${cycle}` : ''}`, {
+    request<{ message: string; isPaid: boolean; cycle: string; balanceAfter: number }>(`/api/commitments/${id}/toggle-paid${cycle ? `?cycle=${cycle}` : ''}`, {
       method: 'POST',
     }),
 

@@ -95,35 +95,70 @@ public class ProfileRepository : IProfileRepository
         return affected > 0;
     }
 
-    public async Task<bool> MarkCommitmentPaidFromCaixinhaAsync(int id, string cycle)
+    public async Task<(bool success, bool isPaid, decimal balanceAfter)> ToggleCommitmentPaidAsync(int id, string cycle)
     {
         using var connection = _connectionFactory.CreateConnection();
         var commitment = await GetFixedCommitmentByIdAsync(id);
-        if (commitment == null) return false;
+        if (commitment == null) return (false, false, 0);
 
-        if (commitment.LastPaidCycle == cycle)
+        var isAlreadyPaid = string.Equals(commitment.LastPaidCycle, cycle, StringComparison.OrdinalIgnoreCase);
+        var isCaixinha = string.Equals(commitment.PaymentSource, "PIX_CAIXINHA", StringComparison.OrdinalIgnoreCase);
+
+        if (isAlreadyPaid)
         {
-            return true;
+            // Unmark: LastPaidCycle = NULL and refund if Caixinha
+            var sql = @"
+                BEGIN TRANSACTION;
+
+                " + (isCaixinha ? @"
+                UPDATE dbo.FinancialProfile
+                SET NubankCaixinhaBalance = NubankCaixinhaBalance + @Amount
+                WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+                " : "") + @"
+
+                UPDATE dbo.FixedCommitments
+                SET LastPaidCycle = NULL
+                WHERE Id = @Id;
+
+                SELECT TOP 1 NubankCaixinhaBalance FROM dbo.FinancialProfile ORDER BY Id ASC;
+
+                COMMIT TRANSACTION;";
+
+            var balance = await connection.ExecuteScalarAsync<decimal>(sql, new { Id = id, Amount = commitment.Amount });
+            return (true, false, balance);
         }
+        else
+        {
+            // Mark: LastPaidCycle = @Cycle and deduct if Caixinha
+            var sql = @"
+                BEGIN TRANSACTION;
 
-        const string sql = @"
-            BEGIN TRANSACTION;
+                " + (isCaixinha ? @"
+                UPDATE dbo.FinancialProfile
+                SET NubankCaixinhaBalance = CASE 
+                    WHEN NubankCaixinhaBalance - @Amount < 0 THEN 0 
+                    ELSE NubankCaixinhaBalance - @Amount 
+                END
+                WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+                " : "") + @"
 
-            UPDATE dbo.FinancialProfile
-            SET NubankCaixinhaBalance = CASE 
-                WHEN NubankCaixinhaBalance - @Amount < 0 THEN 0 
-                ELSE NubankCaixinhaBalance - @Amount 
-            END
-            WHERE Id = (SELECT TOP 1 Id FROM dbo.FinancialProfile ORDER BY Id ASC);
+                UPDATE dbo.FixedCommitments
+                SET LastPaidCycle = @Cycle
+                WHERE Id = @Id;
 
-            UPDATE dbo.FixedCommitments
-            SET LastPaidCycle = @Cycle
-            WHERE Id = @Id;
+                SELECT TOP 1 NubankCaixinhaBalance FROM dbo.FinancialProfile ORDER BY Id ASC;
 
-            COMMIT TRANSACTION;";
+                COMMIT TRANSACTION;";
 
-        var affected = await connection.ExecuteAsync(sql, new { Id = id, Amount = commitment.Amount, Cycle = cycle });
-        return affected > 0;
+            var balance = await connection.ExecuteScalarAsync<decimal>(sql, new { Id = id, Amount = commitment.Amount, Cycle = cycle });
+            return (true, true, balance);
+        }
+    }
+
+    public async Task<bool> MarkCommitmentPaidFromCaixinhaAsync(int id, string cycle)
+    {
+        var result = await ToggleCommitmentPaidAsync(id, cycle);
+        return result.success;
     }
 
     public async Task<IEnumerable<FixedCommitment>> GetFixedCommitmentsAsync(bool onlyActive = true)

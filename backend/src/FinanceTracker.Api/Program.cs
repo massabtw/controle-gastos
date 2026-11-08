@@ -83,6 +83,32 @@ try
         UPDATE dbo.FixedCommitments SET Title = N'Internet Móvel Mãe' WHERE Title LIKE '%Internet%';
         UPDATE dbo.FixedCommitments SET Title = N'Monitor Mãe' WHERE Title LIKE '%Monitor%';
         UPDATE dbo.FixedCommitments SET CommitmentType = 'PIX_COMMITMENT', PaymentSource = 'PIX_CAIXINHA' WHERE CommitmentType IS NULL OR CommitmentType = '';
+
+        -- Ensure Internet Móvel Mãe exists as PIX_COMMITMENT
+        IF NOT EXISTS (SELECT 1 FROM dbo.FixedCommitments WHERE Title LIKE N'%Internet%M%e%')
+        BEGIN
+            INSERT INTO dbo.FixedCommitments (Title, Amount, StartCycle, TotalInstallments, IsActive, CommitmentType, PaymentSource, BillingDay, LastPaidCycle)
+            VALUES (N'Internet Móvel Mãe', 50.00, '2026-12', NULL, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 10, NULL);
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.FixedCommitments 
+            SET IsActive = 1, CommitmentType = 'PIX_COMMITMENT', PaymentSource = 'PIX_CAIXINHA', Amount = 50.00
+            WHERE Title LIKE N'%Internet%M%e%';
+        END
+
+        -- Ensure Monitor Mãe exists as PIX_COMMITMENT
+        IF NOT EXISTS (SELECT 1 FROM dbo.FixedCommitments WHERE Title LIKE N'%Monitor%M%e%')
+        BEGIN
+            INSERT INTO dbo.FixedCommitments (Title, Amount, StartCycle, TotalInstallments, IsActive, CommitmentType, PaymentSource, BillingDay, LastPaidCycle)
+            VALUES (N'Monitor Mãe', 120.00, '2026-12', 5, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 15, NULL);
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.FixedCommitments 
+            SET IsActive = 1, CommitmentType = 'PIX_COMMITMENT', PaymentSource = 'PIX_CAIXINHA', Amount = 120.00
+            WHERE Title LIKE N'%Monitor%M%e%';
+        END
     ");
 }
 catch (Exception ex)

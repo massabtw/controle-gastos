@@ -22,13 +22,13 @@ export function HeroBentoGrid({
 
   if (!summary) return null;
 
-  const handlePayFromCaixinha = async (commitmentId: number) => {
+  const handleToggleCommitmentPaid = async (commitmentId: number) => {
     setPayingId(commitmentId);
     try {
-      await api.payCommitmentFromCaixinha(commitmentId, summary.billingCycle);
+      await api.toggleCommitmentPaid(commitmentId, summary.billingCycle);
       onCommitmentPaid?.();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Falha ao baixar compromisso';
+      const message = err instanceof Error ? err.message : 'Falha ao alterar status do compromisso';
       alert(`Erro: ${message}`);
     } finally {
       setPayingId(null);
@@ -332,22 +332,34 @@ export function HeroBentoGrid({
                   {c.badge}
                 </span>
 
-                {/* Status & action for Caixinha commitments */}
+                {/* Status & interactive toggle action for Caixinha commitments */}
                 {c.paymentSource === 'PIX_CAIXINHA' && (
-                  c.isPaidInCycle ? (
-                    <span className="flex items-center gap-0.5 text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> Pago
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handlePayFromCaixinha(c.id)}
-                      disabled={payingId === c.id}
-                      className="text-[10px] font-mono font-bold text-cyan-300 hover:text-cyan-200 bg-cyan-500/20 hover:bg-cyan-500/30 px-1.5 py-0.5 rounded transition-colors cursor-pointer border border-cyan-500/30"
-                      title="Debitar valor da Caixinha Nubank para este ciclo"
-                    >
-                      {payingId === c.id ? 'Baixando...' : 'Dar Baixa 🐷'}
-                    </button>
-                  )
+                  <button
+                    onClick={() => handleToggleCommitmentPaid(c.id)}
+                    disabled={payingId === c.id}
+                    title={
+                      c.isPaidInCycle
+                        ? 'Clique para desmarcar e estornar valor de volta para a Caixinha'
+                        : 'Clique para marcar como pago e debitar da Caixinha Nubank'
+                    }
+                    className={`flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg transition-all cursor-pointer border group ${
+                      c.isPaidInCycle
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40'
+                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/30 hover:text-cyan-100'
+                    }`}
+                  >
+                    {payingId === c.id ? (
+                      <span>Aguarde...</span>
+                    ) : c.isPaidInCycle ? (
+                      <>
+                        <CheckCircle2 className="w-2.5 h-2.5 group-hover:hidden" />
+                        <span className="group-hover:hidden">Pago</span>
+                        <span className="hidden group-hover:inline">Desmarcar ↩</span>
+                      </>
+                    ) : (
+                      <span>Dar Baixa 🐷</span>
+                    )}
+                  </button>
                 )}
               </div>
             ))}

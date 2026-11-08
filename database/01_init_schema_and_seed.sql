@@ -84,12 +84,20 @@ BEGIN
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM [dbo].[FixedCommitments])
+IF NOT EXISTS (SELECT 1 FROM [dbo].[FixedCommitments] WHERE Title LIKE N'%Internet%M%e%')
 BEGIN
     INSERT INTO [dbo].[FixedCommitments] 
         ([Title], [Amount], [StartCycle], [TotalInstallments], [IsActive], [CommitmentType], [PaymentSource], [BillingDay])
     VALUES 
-        (N'Internet Móvel Mãe', 50.00, '2026-12', NULL, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 10),
+        (N'Internet Móvel Mãe', 50.00, '2026-12', NULL, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 10);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[FixedCommitments] WHERE Title LIKE N'%Monitor%M%e%')
+BEGIN
+    INSERT INTO [dbo].[FixedCommitments] 
+        ([Title], [Amount], [StartCycle], [TotalInstallments], [IsActive], [CommitmentType], [PaymentSource], [BillingDay])
+    VALUES 
         (N'Monitor Mãe', 120.00, '2026-12', 5, 1, 'PIX_COMMITMENT', 'PIX_CAIXINHA', 15);
 END
 GO

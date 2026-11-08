@@ -576,6 +576,8 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
 
   if (!isOpen || !profile) return null;
 
+  const pixCommitments = commitments.filter((c) => c.commitmentType !== 'SUBSCRIPTION');
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -670,7 +672,7 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Compromissos Pix Mãe ({commitments.length})
+            Compromissos Fixos Pix ({pixCommitments.length})
           </button>
         </div>
 
@@ -838,7 +840,7 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
               <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
                 Compromissos Cadastrados:
               </span>
-              {commitments.map((c) => (
+              {pixCommitments.map((c) => (
                 <div
                   key={c.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 text-xs"

@@ -33,10 +33,8 @@ export function SubscriptionsTab({
     setLoading(true);
     try {
       const data = await api.getProfile();
-      // Filter commitments that are subscriptions (or indefinite recurring fixed commitments)
-      const subs = data.commitments.filter(
-        (c) => c.commitmentType === 'SUBSCRIPTION' || c.totalInstallments === null
-      );
+      // Filter commitments that are strictly subscriptions
+      const subs = data.commitments.filter((c) => c.commitmentType === 'SUBSCRIPTION');
       setSubscriptions(subs);
     } catch (err) {
       console.error('Error fetching subscriptions:', err);

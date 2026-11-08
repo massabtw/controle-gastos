@@ -15,18 +15,30 @@ public class CommitmentsController : ControllerBase
         _profileRepository = profileRepository;
     }
 
-    [HttpPost("{id:int}/pay-from-caixinha")]
-    public async Task<IActionResult> PayFromCaixinha(int id, [FromQuery] string? cycle)
+    [HttpPost("{id:int}/toggle-paid")]
+    public async Task<IActionResult> TogglePaid(int id, [FromQuery] string? cycle)
     {
         var profile = await _profileRepository.GetProfileAsync();
         var targetCycle = string.IsNullOrWhiteSpace(cycle)
             ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
             : cycle;
 
-        var success = await _profileRepository.MarkCommitmentPaidFromCaixinhaAsync(id, targetCycle);
+        var (success, isPaid, balanceAfter) = await _profileRepository.ToggleCommitmentPaidAsync(id, targetCycle);
         if (!success)
-            return BadRequest(new { message = "Could not mark commitment as paid from Caixinha." });
+            return BadRequest(new { message = "Could not toggle commitment paid state." });
 
-        return Ok(new { message = "Commitment marked as paid from Caixinha.", cycle = targetCycle });
+        return Ok(new
+        {
+            message = isPaid ? "Commitment marked as paid." : "Commitment unmarked as paid and refunded.",
+            isPaid,
+            cycle = targetCycle,
+            balanceAfter
+        });
+    }
+
+    [HttpPost("{id:int}/pay-from-caixinha")]
+    public async Task<IActionResult> PayFromCaixinha(int id, [FromQuery] string? cycle)
+    {
+        return await TogglePaid(id, cycle);
     }
 }
