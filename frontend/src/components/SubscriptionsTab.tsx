@@ -103,7 +103,7 @@ export function SubscriptionsTab({
               <RefreshCw className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black font-mono text-zinc-100">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-zinc-100">
             R${' '}
             {totalSubsMonthly.toLocaleString('pt-BR', {
               minimumFractionDigits: 2,
@@ -126,7 +126,7 @@ export function SubscriptionsTab({
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black font-mono text-emerald-400">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-emerald-400">
             {cardPctOfCap.toFixed(1)}%
             <span className="text-xs font-sans text-zinc-400 font-normal"> do teto</span>
           </div>
@@ -147,7 +147,7 @@ export function SubscriptionsTab({
           </div>
           <button
             onClick={onOpenNewSubscription}
-            className="mt-3 w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+            className="mt-3 min-h-[44px] w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>+ Nova Assinatura</span>
@@ -156,7 +156,7 @@ export function SubscriptionsTab({
       </div>
 
       {/* Subscriptions List */}
-      <div className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-6 shadow-xl backdrop-blur-md">
+      <div className="rounded-3xl border border-zinc-800 bg-zinc-900/70 p-4 sm:p-6 shadow-xl backdrop-blur-md">
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800 mb-4">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-bold text-zinc-100">Assinaturas Cadastradas</h3>
@@ -167,7 +167,7 @@ export function SubscriptionsTab({
           <button
             onClick={fetchSubscriptions}
             disabled={loading}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
             title="Atualizar lista"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -185,7 +185,7 @@ export function SubscriptionsTab({
             </p>
             <button
               onClick={onOpenNewSubscription}
-              className="py-2 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
+              className="min-h-[44px] py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Cadastrar Primeira Assinatura</span>
@@ -203,16 +203,16 @@ export function SubscriptionsTab({
                   layout
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                  className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                     sub.isActive
                       ? 'bg-zinc-950/70 border-zinc-800/90'
                       : 'bg-zinc-950/30 border-zinc-900 opacity-60'
                   }`}
                 >
                   {/* Left Info */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div
-                      className={`p-2.5 rounded-xl ${
+                      className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${
                         isCard
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : isCaixinha
@@ -227,11 +227,11 @@ export function SubscriptionsTab({
                       )}
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-zinc-100">{sub.title}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm text-zinc-100 truncate">{sub.title}</div>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
                         <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold ${
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
                             isCard
                               ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                               : 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
@@ -240,47 +240,43 @@ export function SubscriptionsTab({
                           {isCard ? '💳 Fatura Cartão' : '🐷 Pix Caixinha'}
                         </span>
                         {!sub.isActive && (
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 whitespace-nowrap">
                             Pausada
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs text-zinc-400 mt-1 font-mono">
+                      <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-1 font-mono flex-wrap">
                         {sub.billingDay && (
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 whitespace-nowrap">
                             <Calendar className="w-3 h-3 text-zinc-500" />
-                            Cobrança: dia {sub.billingDay}
+                            Dia {sub.billingDay}
                           </span>
                         )}
                         <span>•</span>
-                        <span>Início: {sub.startCycle}</span>
-                        {isCard && (
-                          <>
-                            <span>•</span>
-                            <span className="text-emerald-400/90">Soma na fatura mensal</span>
-                          </>
-                        )}
+                        <span className="whitespace-nowrap">Início: {sub.startCycle}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Right Actions */}
-                  <div className="flex items-center gap-4 self-end sm:self-center">
-                    <span className="text-base font-black font-mono text-zinc-100">
-                      R${' '}
-                      {sub.amount.toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                      <span className="text-[10px] font-sans text-zinc-500 font-normal"> / mês</span>
-                    </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right whitespace-nowrap">
+                      <span className="text-sm sm:text-base font-black font-mono text-zinc-100 block">
+                        R${' '}
+                        {sub.amount.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                      <span className="text-[10px] font-sans text-zinc-500 block">/ mês</span>
+                    </div>
 
                     {/* Toggle Active */}
                     <button
                       onClick={() => handleToggleActive(sub)}
                       disabled={togglingId === sub.id}
-                      className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${
+                      className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border transition-colors cursor-pointer ${
                         sub.isActive
                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
                           : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:text-zinc-300'
@@ -297,7 +293,7 @@ export function SubscriptionsTab({
                     {/* Delete */}
                     <button
                       onClick={() => handleDelete(sub.id, sub.title)}
-                      className="p-1.5 rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       title="Excluir assinatura"
                     >
                       <Trash2 className="w-4 h-4" />

@@ -7,6 +7,37 @@ import { api, CardExpense, FinancialProfile, FixedCommitment } from '@/lib/api';
 
 const CATEGORIES = ['Alimentação', 'Transporte', 'Lazer', 'Compras', 'Assinaturas', 'Saúde', 'Outros'];
 
+function BottomSheetShell({
+  onClose,
+  maxWidthClass = 'max-w-md',
+  children,
+}: {
+  onClose: () => void;
+  maxWidthClass?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        className={`w-full ${maxWidthClass} rounded-t-2xl sm:rounded-3xl bg-zinc-900 border-t sm:border border-zinc-800 p-5 sm:p-6 pb-[calc(env(safe-area-inset-bottom,16px)+1.25rem)] sm:pb-6 shadow-2xl text-zinc-100 max-h-[92dvh] overflow-y-auto relative`}
+      >
+        {/* Mobile Bottom-Sheet Drag Handle Pill */}
+        <div className="w-12 h-1.5 bg-zinc-700/80 rounded-full mx-auto mb-3.5 sm:hidden" />
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
 // 1. NEW EXPENSE MODAL (WITH PAYMENT SOURCE SELECTOR)
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -66,13 +97,7 @@ export function NewExpenseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-bold text-zinc-100">Novo Lançamento</h3>
@@ -84,7 +109,7 @@ export function NewExpenseModal({
               {paymentMethod === 'CARD' ? 'Fatura Cartão' : paymentMethod === 'PIX_CAIXINHA' ? 'Pix Caixinha' : 'Pix Saldo Conta'}
             </span>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -99,7 +124,7 @@ export function NewExpenseModal({
               <button
                 type="button"
                 onClick={() => setPaymentMethod('CARD')}
-                className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                className={`min-h-[48px] py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                   paymentMethod === 'CARD'
                     ? 'bg-emerald-500 text-zinc-950 shadow-md font-bold'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -111,7 +136,7 @@ export function NewExpenseModal({
               <button
                 type="button"
                 onClick={() => setPaymentMethod('PIX_CAIXINHA')}
-                className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                className={`min-h-[48px] py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                   paymentMethod === 'PIX_CAIXINHA'
                     ? 'bg-cyan-500 text-zinc-950 shadow-md font-bold'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -123,7 +148,7 @@ export function NewExpenseModal({
               <button
                 type="button"
                 onClick={() => setPaymentMethod('PIX_ACCOUNT')}
-                className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ${
+                className={`min-h-[48px] py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 cursor-pointer ${
                   paymentMethod === 'PIX_ACCOUNT'
                     ? 'bg-blue-500 text-zinc-950 shadow-md font-bold'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -145,7 +170,7 @@ export function NewExpenseModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Supermercado, Uber, Barbearia..."
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
@@ -156,13 +181,14 @@ export function NewExpenseModal({
               </label>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
               />
             </div>
 
@@ -174,7 +200,7 @@ export function NewExpenseModal({
                 <select
                   value={installments}
                   onChange={(e) => setInstallments(Number(e.target.value))}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
                     <option key={n} value={n}>
@@ -188,7 +214,7 @@ export function NewExpenseModal({
                 <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
                   Pagamento
                 </label>
-                <div className="w-full bg-zinc-950/70 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-400 flex items-center gap-1.5 font-medium">
+                <div className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-400 flex items-center gap-1.5 font-medium">
                   <span>À vista (1x)</span>
                 </div>
               </div>
@@ -213,7 +239,7 @@ export function NewExpenseModal({
                   type="checkbox"
                   checked={deductFromCycleCap}
                   onChange={(e) => setDeductFromCycleCap(e.target.checked)}
-                  className="rounded text-cyan-500 focus:ring-cyan-400 bg-zinc-900 border-zinc-700"
+                  className="w-4 h-4 rounded text-cyan-500 focus:ring-cyan-400 bg-zinc-900 border-zinc-700"
                 />
                 <span>Abater do Teto Livre deste ciclo (proteger meta de R$ 1.000)</span>
               </label>
@@ -234,7 +260,7 @@ export function NewExpenseModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -252,7 +278,7 @@ export function NewExpenseModal({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -261,21 +287,20 @@ export function NewExpenseModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-md transition-all cursor-pointer"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-md transition-all cursor-pointer"
             >
               {loading ? 'Salvando...' : 'Salvar Lançamento'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -333,13 +358,7 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div>
             <h3 className="text-base font-bold text-zinc-100">Editar Gasto</h3>
@@ -349,7 +368,7 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
               </span>
             )}
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -364,7 +383,7 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
@@ -375,12 +394,13 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
               </label>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
               />
             </div>
 
@@ -391,7 +411,7 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-emerald-500"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -410,17 +430,17 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
           {isGroup && (
-            <label className="flex items-center gap-2 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 text-xs text-zinc-300 cursor-pointer">
+            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800 text-xs text-zinc-300 cursor-pointer">
               <input
                 type="checkbox"
                 checked={updateAll}
                 onChange={(e) => setUpdateAll(e.target.checked)}
-                className="rounded border-zinc-700 text-emerald-500 focus:ring-0"
+                className="w-4 h-4 rounded border-zinc-700 text-emerald-500 focus:ring-0"
               />
               <span>Atualizar título e categoria em todas as {expense.installmentTotal} parcelas</span>
             </label>
@@ -430,21 +450,20 @@ export function EditExpenseModal({ expense, onClose, onSuccess }: EditExpenseMod
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-md transition-all cursor-pointer"
+              className="min-h-[44px] px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-md transition-all cursor-pointer"
             >
               {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -477,13 +496,7 @@ export function DeleteConfirmModal({ expense, onClose, onSuccess }: DeleteConfir
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose} maxWidthClass="max-w-sm">
         <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center mb-4">
           <Trash2 className="w-5 h-5" />
         </div>
@@ -498,20 +511,20 @@ export function DeleteConfirmModal({ expense, onClose, onSuccess }: DeleteConfir
             <button
               onClick={() => handleDelete(false)}
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors"
+              className="min-h-[44px] w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
             >
               Excluir apenas esta parcela ({expense.installmentCurrent}/{expense.installmentTotal})
             </button>
             <button
               onClick={() => handleDelete(true)}
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-md"
+              className="min-h-[44px] w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-md cursor-pointer"
             >
               Excluir todas as {expense.installmentTotal} parcelas da compra
             </button>
             <button
               onClick={onClose}
-              className="w-full py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] w-full py-2 text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
@@ -520,21 +533,20 @@ export function DeleteConfirmModal({ expense, onClose, onSuccess }: DeleteConfir
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               onClick={() => handleDelete(false)}
               disabled={loading}
-              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-md"
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-md cursor-pointer"
             >
               {loading ? 'Excluindo...' : 'Sim, Excluir'}
             </button>
           </div>
         )}
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -635,44 +647,38 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-xl rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100 max-h-[90vh] overflow-y-auto"
-      >
+    <BottomSheetShell onClose={onClose} maxWidthClass="max-w-xl">
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <Settings2 className="w-5 h-5 text-emerald-400" />
             <h3 className="text-base font-bold text-zinc-100">Configurações & Parâmetros</h3>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab switch */}
-        <div className="flex border-b border-zinc-800 mt-4 mb-5">
+        <div className="grid grid-cols-2 border-b border-zinc-800 mt-3 mb-5">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`pb-2.5 text-xs font-bold uppercase tracking-wider px-4 border-b-2 transition-all ${
+            className={`min-h-[44px] pb-2 text-xs font-bold uppercase tracking-wider px-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'profile'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Perfil & Regras Financeiras
+            Perfil & Regras
           </button>
           <button
             onClick={() => setActiveTab('commitments')}
-            className={`pb-2.5 text-xs font-bold uppercase tracking-wider px-4 border-b-2 transition-all ${
+            className={`min-h-[44px] pb-2 text-xs font-bold uppercase tracking-wider px-2 border-b-2 transition-all cursor-pointer ${
               activeTab === 'commitments'
                 ? 'border-emerald-500 text-emerald-400'
                 : 'border-transparent text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            Compromissos Fixos Pix ({pixCommitments.length})
+            Compromissos Pix ({pixCommitments.length})
           </button>
         </div>
 
@@ -685,10 +691,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={profile.incomeFirstTranche}
                   onChange={(e) => setProfile({ ...profile, incomeFirstTranche: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
 
@@ -698,10 +705,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={profile.incomeSecondTranche}
                   onChange={(e) => setProfile({ ...profile, incomeSecondTranche: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
             </div>
@@ -713,10 +721,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={profile.monthlyInvestmentGoal}
                   onChange={(e) => setProfile({ ...profile, monthlyInvestmentGoal: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
 
@@ -726,10 +735,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={profile.cdiAnnualRate}
                   onChange={(e) => setProfile({ ...profile, cdiAnnualRate: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
             </div>
@@ -741,11 +751,12 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   max="31"
                   value={profile.closingDay}
                   onChange={(e) => setProfile({ ...profile, closingDay: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
 
@@ -755,11 +766,12 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   max="31"
                   value={profile.dueDay}
                   onChange={(e) => setProfile({ ...profile, dueDay: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
             </div>
@@ -772,10 +784,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={profile.nubankCaixinhaBalance ?? 0}
                   onChange={(e) => setProfile({ ...profile, nubankCaixinhaBalance: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
 
@@ -785,10 +798,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="1"
                   value={profile.nubankCaixinhaCdiRate ?? 115}
                   onChange={(e) => setProfile({ ...profile, nubankCaixinhaCdiRate: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-purple-500/40 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
             </div>
@@ -801,10 +815,11 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={profile.creditCardLimit ?? 2500}
                   onChange={(e) => setProfile({ ...profile, creditCardLimit: Number(e.target.value) })}
-                  className="w-full bg-zinc-950/70 border border-blue-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-blue-500/40 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
 
@@ -814,11 +829,12 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   placeholder="Automático (Fórmula)"
                   value={profile.customCardCap ?? ''}
                   onChange={(e) => setProfile({ ...profile, customCardCap: e.target.value ? Number(e.target.value) : null })}
-                  className="w-full bg-zinc-950/70 border border-blue-500/40 rounded-xl px-3.5 py-2 text-sm font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-blue-500/40 rounded-xl px-3.5 py-2 text-base sm:text-sm font-mono text-zinc-100"
                 />
               </div>
             </div>
@@ -827,7 +843,7 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
               <button
                 type="submit"
                 disabled={loading}
-                className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold shadow-md transition-all cursor-pointer"
+                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold shadow-md transition-all cursor-pointer"
               >
                 {loading ? 'Salvando...' : 'Salvar Regras'}
               </button>
@@ -858,7 +874,7 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                     </span>
                     <button
                       onClick={() => handleDeleteCommitment(c.id)}
-                      className="p-1 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -873,40 +889,41 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                 Adicionar Novo Pix/Compromisso Externo
               </span>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text"
                   required
                   placeholder="Título (ex: Seguro Mãe)"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-base sm:text-xs text-zinc-100"
                 />
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   required
                   placeholder="Valor (R$)"
                   value={newAmount}
                   onChange={(e) => setNewAmount(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-base sm:text-xs font-mono text-zinc-100"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text"
                   required
                   placeholder="Ciclo Início (YYYY-MM)"
                   value={newStartCycle}
                   onChange={(e) => setNewStartCycle(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-mono text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-base sm:text-xs font-mono text-zinc-100"
                 />
 
                 <select
                   value={isFixedIndefinite ? 'indefinite' : 'fixed'}
                   onChange={(e) => setIsFixedIndefinite(e.target.value === 'indefinite')}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-100"
+                  className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-base sm:text-xs text-zinc-100"
                 >
                   <option value="indefinite">Fixo Recorrente</option>
                   <option value="fixed">Duração em Meses</option>
@@ -918,11 +935,12 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
                   <label className="text-[11px] text-zinc-400 block mb-1">Quantidade de Meses:</label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     min="1"
                     max="60"
                     value={newTotalInstallments}
                     onChange={(e) => setNewTotalInstallments(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-mono text-zinc-100"
+                    className="w-full min-h-[44px] bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-base sm:text-xs font-mono text-zinc-100"
                   />
                 </div>
               )}
@@ -930,15 +948,14 @@ export function SettingsModal({ isOpen, onClose, onSuccess }: SettingsModalProps
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-colors cursor-pointer"
+                className="min-h-[44px] w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition-colors cursor-pointer"
               >
                 {loading ? 'Adicionando...' : '+ Adicionar Compromisso'}
               </button>
             </form>
           </div>
         )}
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -990,13 +1007,7 @@ export function SyncInvoiceModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
@@ -1007,7 +1018,7 @@ export function SyncInvoiceModal({
               <span className="text-xs text-zinc-400 font-mono">Ciclo {cycle}</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1027,13 +1038,14 @@ export function SyncInvoiceModal({
               </span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 required
                 value={targetTotalStr}
                 onChange={(e) => setTargetTotalStr(e.target.value)}
                 placeholder="Ex: 450.90"
-                className="w-full bg-zinc-950/70 border border-purple-500/50 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base text-zinc-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-purple-500/50 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base text-zinc-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
               />
             </div>
           </div>
@@ -1060,21 +1072,20 @@ export function SyncInvoiceModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
             >
               {loading ? 'Sincronizando...' : 'Calibrar Fatura'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -1128,13 +1139,7 @@ export function UpdateCaixinhaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
@@ -1145,7 +1150,7 @@ export function UpdateCaixinhaModal({
               <span className="text-[10px] font-mono text-purple-400">Rendimento a 115% do CDI</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1165,13 +1170,14 @@ export function UpdateCaixinhaModal({
               </span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 required
                 value={balanceStr}
                 onChange={(e) => setBalanceStr(e.target.value)}
                 placeholder="Ex: 5000.00"
-                className="w-full bg-zinc-950/70 border border-purple-500/50 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base text-zinc-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-purple-500/50 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base text-zinc-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
               />
             </div>
           </div>
@@ -1196,21 +1202,20 @@ export function UpdateCaixinhaModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
             >
               {loading ? 'Salvando...' : 'Salvar Saldo'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -1267,13 +1272,7 @@ export function PixCaixinhaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">
@@ -1284,7 +1283,7 @@ export function PixCaixinhaModal({
               <span className="text-[10px] font-mono text-cyan-400">Pagar no Pix fora do cartão</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1300,7 +1299,7 @@ export function PixCaixinhaModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Corte de cabelo, Lanche, Pix dentista..."
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-cyan-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-cyan-500"
             />
           </div>
 
@@ -1315,13 +1314,14 @@ export function PixCaixinhaModal({
                 </span>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0.01"
                   required
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   placeholder="0.00"
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-3 text-sm font-mono text-zinc-100 focus:outline-none focus:border-cyan-500"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-3 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -1333,7 +1333,7 @@ export function PixCaixinhaModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-cyan-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-cyan-500"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -1352,7 +1352,7 @@ export function PixCaixinhaModal({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-cyan-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-cyan-500"
             />
           </div>
 
@@ -1396,22 +1396,21 @@ export function PixCaixinhaModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading || amount <= 0}
-              className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" />
               {loading ? 'Processando...' : 'Confirmar Retirada Pix'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -1481,13 +1480,7 @@ export function EditCardLimitModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
@@ -1498,7 +1491,7 @@ export function EditCardLimitModal({
               <span className="text-[10px] font-mono text-blue-400">Configuração de Teto e Limite Bancário</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1515,13 +1508,14 @@ export function EditCardLimitModal({
               </span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="1"
                 required
                 value={bankLimitStr}
                 onChange={(e) => setBankLimitStr(e.target.value)}
                 placeholder="2500.00"
-                className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 font-mono text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+                className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
               />
             </div>
             <span className="text-[11px] text-zinc-500 mt-1 block">
@@ -1539,7 +1533,7 @@ export function EditCardLimitModal({
               <button
                 type="button"
                 onClick={() => setIsCustomCap(false)}
-                className={`p-3 rounded-2xl border text-left transition-all ${
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                   !isCustomCap
                     ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-300 shadow-sm'
                     : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
@@ -1559,7 +1553,7 @@ export function EditCardLimitModal({
               <button
                 type="button"
                 onClick={() => setIsCustomCap(true)}
-                className={`p-3 rounded-2xl border text-left transition-all ${
+                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                   isCustomCap
                     ? 'bg-blue-950/30 border-blue-500/50 text-blue-300 shadow-sm'
                     : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
@@ -1592,13 +1586,14 @@ export function EditCardLimitModal({
                   </span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     min="1"
                     required
                     value={customCapStr}
                     onChange={(e) => setCustomCapStr(e.target.value)}
                     placeholder="1030.00"
-                    className="w-full bg-zinc-950/70 border border-blue-500/60 rounded-xl py-2.5 pl-10 pr-4 font-mono text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full min-h-[44px] bg-zinc-950/70 border border-blue-500/60 rounded-xl py-2.5 pl-10 pr-4 font-mono text-base sm:text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
                 <span className="text-[11px] text-blue-400 mt-1 block">
@@ -1612,21 +1607,20 @@ export function EditCardLimitModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer"
             >
               {loading ? 'Salvando...' : 'Salvar Limites'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -1696,13 +1690,7 @@ export function NewSubscriptionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
@@ -1713,7 +1701,7 @@ export function NewSubscriptionModal({
               <span className="text-[10px] font-mono text-purple-400">Lançamento Recorrente Mensal</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1729,7 +1717,7 @@ export function NewSubscriptionModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Google One, Spotify, Netflix, Academia..."
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
             />
           </div>
 
@@ -1744,13 +1732,14 @@ export function NewSubscriptionModal({
                 </span>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0.01"
                   required
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   placeholder="29.90"
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-3 font-mono text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-10 pr-3 font-mono text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
                 />
               </div>
             </div>
@@ -1765,12 +1754,13 @@ export function NewSubscriptionModal({
                 </span>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="1"
                   max="31"
                   required
                   value={billingDay}
                   onChange={(e) => setBillingDay(Number(e.target.value))}
-                  className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-12 pr-3 font-mono text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
+                  className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl py-2.5 pl-12 pr-3 font-mono text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-purple-500"
                 />
               </div>
             </div>
@@ -1785,7 +1775,7 @@ export function NewSubscriptionModal({
               required
               value={startCycle}
               onChange={(e) => setStartCycle(e.target.value)}
-              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-purple-500"
+              className="w-full min-h-[44px] bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-base sm:text-sm font-mono text-zinc-100 focus:outline-none focus:border-purple-500"
             />
             <p className="text-[11px] text-zinc-500 mt-1">
               🔒 A cobrança só entra a partir deste ciclo ({startCycle}). Faturas fechadas anteriores a ele não são alteradas.
@@ -1801,19 +1791,19 @@ export function NewSubscriptionModal({
               <button
                 type="button"
                 onClick={() => setPaymentSource('CARD')}
-                className={`py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                className={`min-h-[44px] py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   paymentSource === 'CARD'
                     ? 'bg-emerald-500 text-zinc-950 shadow-md font-bold'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
                 <CreditCard className="w-3.5 h-3.5" />
-                <span>💳 Cartão de Crédito</span>
+                <span>💳 Cartão</span>
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentSource('PIX_CAIXINHA')}
-                className={`py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                className={`min-h-[44px] py-2 px-2 text-center rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   paymentSource === 'PIX_CAIXINHA'
                     ? 'bg-cyan-500 text-zinc-950 shadow-md font-bold'
                     : 'text-zinc-400 hover:text-zinc-200'
@@ -1834,22 +1824,21 @@ export function NewSubscriptionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               {loading ? 'Adicionando...' : 'Cadastrar Assinatura'}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -1911,13 +1900,7 @@ export function DepositCaixinhaModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
@@ -1928,7 +1911,7 @@ export function DepositCaixinhaModal({
               <span className="text-[10px] font-mono text-purple-400">Rendimento a 115% do CDI</span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1949,7 +1932,7 @@ export function DepositCaixinhaModal({
                   type="button"
                   key={val}
                   onClick={() => handlePreset(val)}
-                  className="py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-all cursor-pointer"
+                  className="min-h-[44px] py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-xs font-mono font-bold transition-all cursor-pointer"
                 >
                   +R$ {val}
                 </button>
@@ -1967,13 +1950,14 @@ export function DepositCaixinhaModal({
               </span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 required
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
                 placeholder="0,00"
-                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-3 text-lg font-mono font-bold text-purple-300 focus:outline-none focus:border-purple-500/60"
+                className="w-full min-h-[48px] rounded-2xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-2.5 text-lg font-mono font-bold text-purple-300 focus:outline-none focus:border-purple-500/60"
               />
             </div>
           </div>
@@ -1987,7 +1971,7 @@ export function DepositCaixinhaModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Sobra da semana, Depósito extra"
-              className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-purple-500/60"
+              className="w-full min-h-[44px] rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-base sm:text-sm text-zinc-200 focus:outline-none focus:border-purple-500/60"
             />
           </div>
 
@@ -2021,22 +2005,21 @@ export function DepositCaixinhaModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading || amount <= 0}
-              className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
               {loading ? 'Adicionando...' : `Adicionar R$ ${amount.toFixed(2)}`}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -2097,13 +2080,7 @@ export function ReceivePixModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl text-zinc-100"
-      >
+    <BottomSheetShell onClose={onClose}>
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
@@ -2116,7 +2093,7 @@ export function ReceivePixModal({
               </span>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 p-1">
+          <button onClick={onClose} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -2139,7 +2116,7 @@ export function ReceivePixModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ex: Pix do João almoço, Reembolso Pedro"
-              className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/60"
+              className="w-full min-h-[44px] rounded-2xl bg-zinc-950 border border-zinc-800 px-4 py-2.5 text-base sm:text-sm text-zinc-100 focus:outline-none focus:border-emerald-500/60"
             />
           </div>
 
@@ -2153,13 +2130,14 @@ export function ReceivePixModal({
               </span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 required
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
                 placeholder="0,00"
-                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-3 text-lg font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500/60"
+                className="w-full min-h-[48px] rounded-2xl bg-zinc-950 border border-zinc-800 pl-10 pr-4 py-2.5 text-lg font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500/60"
               />
             </div>
           </div>
@@ -2172,7 +2150,7 @@ export function ReceivePixModal({
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/60"
+                className="w-full min-h-[44px] rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-base sm:text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/60"
               >
                 <option value="Entrada">Entrada / Reembolso</option>
                 <option value="Alimentação">Alimentação</option>
@@ -2192,7 +2170,7 @@ export function ReceivePixModal({
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-2.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/60"
+                className="w-full min-h-[44px] rounded-2xl bg-zinc-950 border border-zinc-800 px-3 py-2 text-base sm:text-xs text-zinc-200 focus:outline-none focus:border-emerald-500/60"
               />
             </div>
           </div>
@@ -2223,22 +2201,21 @@ export function ReceivePixModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading || amount <= 0 || !description.trim()}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+              className="min-h-[44px] px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
             >
               <ArrowDownLeft className="w-3.5 h-3.5" />
               {loading ? 'Registrando...' : `Confirmar Pix (+ R$ ${amount.toFixed(2)})`}
             </button>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }
 
@@ -2287,13 +2264,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl relative overflow-hidden"
-      >
+    <BottomSheetShell onClose={onClose} maxWidthClass="max-w-sm">
         <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
@@ -2306,7 +2277,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800/50 hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors"
+            className="min-h-[44px] min-w-[44px] rounded-xl bg-zinc-800/50 hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -2325,7 +2296,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="Ex: 1234"
-              className="w-full text-center tracking-widest text-lg font-mono px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-blue-500"
+              className="w-full min-h-[48px] text-center tracking-widest text-lg font-mono px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-blue-500"
             />
             <p className="text-[11px] text-zinc-500 mt-1">
               Configurado via variável de ambiente <code className="text-zinc-400">APP_PIN</code> no servidor Render.
@@ -2337,7 +2308,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
               <button
                 type="button"
                 onClick={handleRemove}
-                className="px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/20"
+                className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/20 cursor-pointer"
               >
                 Remover PIN
               </button>
@@ -2347,20 +2318,19 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+                className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer"
+                className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer"
               >
                 Salvar PIN
               </button>
             </div>
           </div>
         </form>
-      </motion.div>
-    </div>
+    </BottomSheetShell>
   );
 }

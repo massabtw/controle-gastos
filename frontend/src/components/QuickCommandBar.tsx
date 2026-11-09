@@ -51,10 +51,10 @@ export function QuickCommandBar({ onRefresh }: QuickCommandBarProps) {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto mb-8">
+    <div className="w-full max-w-4xl mx-auto mb-6 sm:mb-8">
       <form onSubmit={handleSubmit} className="relative">
-        <div className="relative flex items-center bg-zinc-900/90 border border-zinc-700/80 rounded-2xl shadow-2xl backdrop-blur-md px-4 py-2.5 transition-all duration-200 focus-within:border-emerald-500/80 focus-within:ring-2 focus-within:ring-emerald-500/20">
-          <div className="flex items-center gap-2 mr-3 text-emerald-400">
+        <div className="relative flex items-center bg-zinc-900/90 border border-zinc-700/80 rounded-2xl shadow-2xl backdrop-blur-md px-3.5 sm:px-4 py-2 transition-all duration-200 focus-within:border-emerald-500/80 focus-within:ring-2 focus-within:ring-emerald-500/20">
+          <div className="flex items-center gap-2 mr-2.5 sm:mr-3 text-emerald-400 shrink-0">
             <Sparkles className="w-5 h-5 animate-pulse" />
             <span className="hidden sm:inline-block text-xs font-semibold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20">
               IA / Natural
@@ -66,12 +66,12 @@ export function QuickCommandBar({ onRefresh }: QuickCommandBarProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Lançamento rápido (ex: 'uber 25', 'pix 40 corte', 'fatura atual 350', '/status' ou '/desfazer')..."
-            className="w-full bg-transparent text-sm sm:text-base text-zinc-100 placeholder-zinc-500 focus:outline-none"
+            placeholder="Ex: 'uber 25', 'pix 40 corte', '/status'..."
+            className="w-full min-h-[44px] bg-transparent text-base sm:text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none"
             disabled={loading}
           />
 
-          <div className="flex items-center gap-2 ml-2">
+          <div className="flex items-center gap-2 ml-2 shrink-0">
             {!input && (
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-mono text-zinc-500 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700">
                 press <kbd>/</kbd>
@@ -81,7 +81,7 @@ export function QuickCommandBar({ onRefresh }: QuickCommandBarProps) {
             <button
               type="submit"
               disabled={loading || !input.trim()}
-              className="flex items-center justify-center p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-medium transition-all shadow-md cursor-pointer disabled:cursor-not-allowed"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-medium transition-all shadow-md cursor-pointer disabled:cursor-not-allowed"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />

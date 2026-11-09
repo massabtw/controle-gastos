@@ -86,11 +86,11 @@ export function ExpenseFeed({
   };
 
   return (
-    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 shadow-xl backdrop-blur-md mb-8">
+    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-4 sm:p-6 shadow-xl backdrop-blur-md mb-8">
       {/* Header & Category Filter Pills */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-zinc-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-zinc-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
             <CreditCard className="w-5 h-5" />
           </div>
           <div>
@@ -101,27 +101,27 @@ export function ExpenseFeed({
               </span>
             </h2>
             <p className="text-xs text-zinc-400">
-              Gastos do cartão computados para o fechamento deste ciclo.
+              Gastos do cartão e da Caixinha computados neste ciclo.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <div className="w-full sm:w-auto flex items-center gap-2">
+          <div className="relative flex-1 sm:flex-initial">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar gasto..."
-              className="bg-zinc-950/70 border border-zinc-700/80 rounded-xl py-1.5 pl-8 pr-7 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 w-36 sm:w-44"
+              className="min-h-[44px] w-full sm:w-44 bg-zinc-950/70 border border-zinc-700/80 rounded-xl py-2 pl-9 pr-8 text-base sm:text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                className="min-h-[44px] px-2.5 absolute right-0 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 flex items-center justify-center"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -129,27 +129,27 @@ export function ExpenseFeed({
           <button
             onClick={handleExportCsv}
             title="Exportar lançamentos deste ciclo para planilha Excel/CSV"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-all cursor-pointer"
+            className="min-h-[44px] shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-all cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-4 h-4" />
             <span className="hidden sm:inline">CSV</span>
           </button>
 
           <button
             onClick={onOpenNewExpense}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all cursor-pointer shadow-sm"
+            className="min-h-[44px] shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all cursor-pointer shadow-sm"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Lançar Manual</span>
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>Novo</span>
           </button>
         </div>
       </div>
 
       {/* Category breakdown filter pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 mb-4">
         <button
           onClick={() => onSelectCategory(null)}
-          className={`text-xs px-3 py-1.5 rounded-xl font-medium border whitespace-nowrap transition-all ${
+          className={`min-h-[44px] text-xs px-3.5 py-2 rounded-xl font-medium border whitespace-nowrap transition-all cursor-pointer ${
             selectedCategory === null
               ? 'bg-zinc-100 text-zinc-950 border-zinc-100 font-bold'
               : 'bg-zinc-950/60 text-zinc-400 border-zinc-800 hover:text-zinc-200'
@@ -164,7 +164,7 @@ export function ExpenseFeed({
             <button
               key={cat.category}
               onClick={() => onSelectCategory(isSelected ? null : cat.category)}
-              className={`text-xs px-3 py-1.5 rounded-xl font-medium border whitespace-nowrap flex items-center gap-1.5 transition-all ${
+              className={`min-h-[44px] text-xs px-3.5 py-2 rounded-xl font-medium border whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
                 isSelected
                   ? 'bg-zinc-100 text-zinc-950 border-zinc-100 font-bold'
                   : 'bg-zinc-950/60 text-zinc-400 border-zinc-800 hover:text-zinc-200'
@@ -194,10 +194,10 @@ export function ExpenseFeed({
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-all group"
+                  className="flex items-center justify-between gap-2.5 p-3 sm:p-3.5 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 hover:border-zinc-700 transition-all group"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className={`w-10 h-10 shrink-0 rounded-xl border flex items-center justify-center transition-colors ${
                       isPixInflow
                         ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                         : isPix
@@ -207,28 +207,28 @@ export function ExpenseFeed({
                       {isPixInflow ? <ArrowDownLeft className="w-4 h-4" /> : isPix ? <Send className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
                     </div>
 
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-zinc-100">
-                          {expense.description}
-                        </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm text-zinc-100 truncate">
+                        {expense.description}
+                      </div>
 
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
                         {isPixInflow ? (
-                          <span className="text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                            💰 Pix Recebido (Caixinha)
+                          <span className="text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-md whitespace-nowrap">
+                            💰 Pix Recebido
                           </span>
                         ) : isPix ? (
-                          <span className="text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded-md whitespace-nowrap">
                             💸 Pix Caixinha
                           </span>
                         ) : (
-                          <span className="text-[10px] font-mono font-medium bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="text-[10px] font-mono font-medium bg-zinc-800 text-zinc-400 border border-zinc-700 px-1.5 py-0.5 rounded-md whitespace-nowrap">
                             💳 Cartão
                           </span>
                         )}
 
                         <span
-                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getCategoryColor(
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${getCategoryColor(
                             expense.category
                           )}`}
                         >
@@ -236,24 +236,22 @@ export function ExpenseFeed({
                         </span>
 
                         {isInstallment && (
-                          <span className="text-[10px] font-mono font-semibold bg-zinc-800 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-md">
+                          <span className="text-[10px] font-mono font-semibold bg-zinc-800 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-md whitespace-nowrap">
                             {expense.installmentCurrent}/{expense.installmentTotal}x
                           </span>
                         )}
-                      </div>
 
-                      <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono mt-0.5">
-                        <span className="flex items-center gap-1">
+                        <span className="text-[10px] text-zinc-500 font-mono flex items-center gap-1 whitespace-nowrap">
                           <Calendar className="w-3 h-3 text-zinc-500" />
-                          {new Date(expense.transactionDate).toLocaleDateString('pt-BR')}
+                          {new Date(expense.transactionDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <span className={`font-mono font-bold text-base ${isPixInflow ? 'text-emerald-400' : 'text-zinc-100'}`}>
+                  <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                    <div className="text-right whitespace-nowrap">
+                      <span className={`font-mono font-bold text-sm sm:text-base block ${isPixInflow ? 'text-emerald-400' : 'text-zinc-100'}`}>
                         {isPixInflow ? '+ ' : ''}R${' '}
                         {expense.amount.toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
@@ -262,16 +260,16 @@ export function ExpenseFeed({
                       </span>
                       {isInstallment && (
                         <span className="block text-[10px] font-mono text-zinc-500">
-                          Total: R$ {(expense.amount * expense.installmentTotal).toFixed(2)}
+                          Total: R$ {(expense.amount * expense.installmentTotal).toFixed(0)}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-0.5">
                       <button
                         onClick={() => onEditExpense(expense)}
                         title="Editar lançamento"
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                        className="min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -279,7 +277,7 @@ export function ExpenseFeed({
                       <button
                         onClick={() => onDeleteExpense(expense)}
                         title="Excluir lançamento"
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        className="min-h-[44px] min-w-[40px] sm:min-w-[44px] flex items-center justify-center rounded-xl text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -301,7 +299,7 @@ export function ExpenseFeed({
           </p>
           <button
             onClick={onOpenNewExpense}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md"
+            className="min-h-[44px] flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Adicionar Primeiro Gasto</span>

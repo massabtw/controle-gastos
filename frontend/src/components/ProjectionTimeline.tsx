@@ -19,15 +19,15 @@ export function ProjectionTimeline({
   if (!projections || projections.length === 0) return null;
 
   return (
-    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 shadow-xl backdrop-blur-md mb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 pb-4 border-b border-zinc-800/80">
+    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/80 p-4 sm:p-6 shadow-xl backdrop-blur-md mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5 sm:mb-6 pb-4 border-b border-zinc-800/80">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
+          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 shrink-0">
             <CalendarRange className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2">
-              Projeção dos Próximos 6 Ciclos
+            <h2 className="text-base font-bold text-zinc-100 flex items-center gap-2 flex-wrap">
+              <span>Projeção dos Próximos 6 Ciclos</span>
               <span className="text-[10px] font-mono uppercase bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-full">
                 Cash-Flow Evolution
               </span>
@@ -39,7 +39,7 @@ export function ProjectionTimeline({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {projections.map((proj, idx) => {
           const isSelected = proj.billingCycle === selectedCycle;
           // When fixed commitments drop from 170 to 50 (Monitor ends!)

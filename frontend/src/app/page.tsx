@@ -98,13 +98,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
+    <div className="min-h-screen w-full overflow-x-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
       {/* Background ambient lighting */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-emerald-600/5 blur-[120px] rounded-full" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+      <div className="relative w-full max-w-md md:max-w-5xl lg:max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pb-20">
         {/* Header */}
         <Header
           summary={summary}
@@ -146,30 +146,32 @@ export default function Home() {
         <PurchaseSimulator summary={summary} />
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 mb-6 p-1.5 bg-zinc-900/80 rounded-2xl border border-zinc-800/80 backdrop-blur-md max-w-xl">
+        <div className="w-full max-w-xl grid grid-cols-3 gap-1.5 mb-6 p-1.5 bg-zinc-900/90 rounded-2xl border border-zinc-800/80 backdrop-blur-md">
           <button
             onClick={() => setMainTab('expenses')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`min-h-[44px] py-2 px-2 sm:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
               mainTab === 'expenses'
                 ? 'bg-zinc-800 text-zinc-100 shadow-md border border-zinc-700/60'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <span>📋 Lançamentos do Cartão</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-700/50 text-zinc-300">
+            <span className="sm:hidden">📋 Cartão</span>
+            <span className="hidden sm:inline">📋 Lançamentos do Cartão</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-700/60 text-zinc-200">
               {expenses.length}
             </span>
           </button>
 
           <button
             onClick={() => setMainTab('subscriptions')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`min-h-[44px] py-2 px-2 sm:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
               mainTab === 'subscriptions'
                 ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30 shadow-md'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <span>🔄 Assinaturas Fixas</span>
+            <span className="sm:hidden">🔄 Fixas</span>
+            <span className="hidden sm:inline">🔄 Assinaturas Fixas</span>
             {summary?.activeSubscriptions && summary.activeSubscriptions.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-purple-500/30 text-purple-200 font-bold">
                 {summary.activeSubscriptions.length}
@@ -179,13 +181,14 @@ export default function Home() {
 
           <button
             onClick={() => setMainTab('projections')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`min-h-[44px] py-2 px-2 sm:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
               mainTab === 'projections'
                 ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30 shadow-md'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            <span>📅 Projeção 6 Meses</span>
+            <span className="sm:hidden">📅 6 Meses</span>
+            <span className="hidden sm:inline">📅 Projeção 6 Meses</span>
           </button>
         </div>
 

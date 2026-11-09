@@ -79,13 +79,13 @@ export function HeroBentoGrid({
     : 100;
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-8">
+    <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 mb-6 sm:mb-8">
       {/* CARD 1: NORTH STAR - DAILY BURN RATE (5 cols) */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className={`lg:col-span-5 relative overflow-hidden rounded-3xl border p-6 flex flex-col justify-between shadow-xl backdrop-blur-md ${
+        className={`lg:col-span-5 relative overflow-hidden rounded-3xl border p-5 sm:p-6 flex flex-col justify-between shadow-xl backdrop-blur-md ${
           isCritical
             ? 'bg-rose-950/20 border-rose-500/40 text-rose-100 shadow-rose-950/30'
             : isWarning
@@ -145,10 +145,10 @@ export function HeroBentoGrid({
           </div>
 
           <div className="my-3">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-xs sm:text-sm text-zinc-400 font-medium">R$</span>
               <span
-                className={`text-4xl sm:text-5xl font-black tracking-tight font-mono ${
+                className={`text-3xl sm:text-5xl font-black tracking-tight font-mono ${
                   isCritical ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
                 }`}
               >
@@ -223,16 +223,16 @@ export function HeroBentoGrid({
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.1 }}
-        className="lg:col-span-4 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-6 flex flex-col justify-between shadow-xl backdrop-blur-md"
+        className="lg:col-span-4 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-5 sm:p-6 flex flex-col justify-between shadow-xl backdrop-blur-md"
       >
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
                 <Shield className="w-5 h-5" />
               </div>
-              <div>
-                <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400 block">
+              <div className="min-w-0">
+                <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400 block truncate">
                   Teto do Cartão
                 </span>
                 {summary.customCardCap && (
@@ -243,33 +243,33 @@ export function HeroBentoGrid({
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {onOpenEditCardLimit && (
                 <button
                   onClick={onOpenEditCardLimit}
-                  className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 font-semibold bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                  className="min-h-[44px] flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
                   title="Ajustar Limite Bancário ou Teto Mensal"
                 >
-                  <Edit3 className="w-3 h-3" />
+                  <Edit3 className="w-3.5 h-3.5" />
                   <span>Ajustar</span>
                 </button>
               )}
-              <span className="text-xs font-mono font-bold text-zinc-300">
+              <span className="text-xs font-mono font-bold text-zinc-300 whitespace-nowrap">
                 {capConsumedPct.toFixed(0)}% Usado
               </span>
             </div>
           </div>
 
           <div className="my-2">
-            <div className="flex items-baseline justify-between mb-2">
-              <span className="text-2xl font-bold font-mono text-zinc-100">
+            <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
+              <span className="text-2xl sm:text-3xl font-bold font-mono text-zinc-100 whitespace-nowrap">
                 R${' '}
                 {totalCapUsed.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
-              <span className="text-xs font-mono text-zinc-400">
+              <span className="text-xs font-mono text-zinc-400 whitespace-nowrap">
                 de R${' '}
                 {summary.cardHardCap.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
@@ -328,15 +328,15 @@ export function HeroBentoGrid({
             {/* Status da Fatura do Ciclo */}
             {summary.isInvoicePaid ? (
               <div className="mt-3 p-3 rounded-2xl bg-emerald-950/25 border border-emerald-500/40 text-xs font-mono space-y-1.5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Fatura Paga! ✅
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>Fatura Paga! ✅</span>
                   </span>
                   <button
                     onClick={handleToggleInvoicePaid}
                     disabled={togglingInvoice}
-                    className="text-[10px] text-zinc-400 hover:text-rose-400 underline cursor-pointer transition-colors"
+                    className="min-h-[44px] px-3 rounded-xl bg-zinc-900/80 border border-zinc-700 text-xs text-zinc-300 hover:text-rose-400 transition-colors cursor-pointer"
                     title="Desfazer marcação de fatura paga"
                   >
                     {togglingInvoice ? '...' : 'Desfazer'}
@@ -351,14 +351,14 @@ export function HeroBentoGrid({
               </div>
             ) : (
               <div className="mt-3 p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800 text-xs font-mono flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-zinc-300">
-                  <CreditCard className="w-4 h-4 text-amber-400" />
-                  <span>Fatura (Vence {new Date(summary.cycleDueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
+                <div className="flex items-center gap-1.5 text-zinc-300 min-w-0">
+                  <CreditCard className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="truncate">Fatura (Vence {new Date(summary.cycleDueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
                 </div>
                 <button
                   onClick={handleToggleInvoicePaid}
                   disabled={togglingInvoice}
-                  className="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md flex items-center gap-1 cursor-pointer"
+                  className="min-h-[44px] shrink-0 whitespace-nowrap px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
                   title="Marcar fatura como paga"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -392,21 +392,23 @@ export function HeroBentoGrid({
         </div>
 
         {/* Active fixed commitments list with Pay from Caixinha action */}
-        <div className="pt-3 mt-3 border-t border-zinc-800/80 space-y-1.5">
+        <div className="pt-3 mt-3 border-t border-zinc-800/80 space-y-2">
           <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
             Compromissos do Ciclo:
           </span>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-col gap-2">
             {summary.activeFixedCommitments.map((c) => (
               <div
                 key={c.id}
-                className="text-[11px] font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-2 py-1 rounded-xl flex items-center gap-1.5"
+                className="min-h-[44px] text-xs font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-3 py-1.5 rounded-xl flex items-center justify-between gap-2"
               >
-                <span className="text-zinc-400">{c.title}:</span>
-                <span className="font-mono font-medium">R$ {c.amount.toFixed(0)}</span>
-                <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1 rounded">
-                  {c.badge}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                  <span className="text-zinc-300 font-medium truncate">{c.title}:</span>
+                  <span className="font-mono font-bold text-zinc-100 whitespace-nowrap">R$ {c.amount.toFixed(0)}</span>
+                  <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded whitespace-nowrap">
+                    {c.badge}
+                  </span>
+                </div>
 
                 {/* Status & interactive toggle action for Caixinha commitments */}
                 {c.paymentSource === 'PIX_CAIXINHA' && (
@@ -418,7 +420,7 @@ export function HeroBentoGrid({
                         ? 'Clique para desmarcar e estornar valor de volta para a Caixinha'
                         : 'Clique para marcar como pago e debitar da Caixinha Nubank'
                     }
-                    className={`flex items-center gap-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-lg transition-all cursor-pointer border group ${
+                    className={`min-h-[36px] shrink-0 whitespace-nowrap flex items-center gap-1 text-[11px] font-mono font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border group ${
                       c.isPaidInCycle
                         ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40'
                         : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/30 hover:text-cyan-100'
@@ -428,8 +430,8 @@ export function HeroBentoGrid({
                       <span>Aguarde...</span>
                     ) : c.isPaidInCycle ? (
                       <>
-                        <CheckCircle2 className="w-2.5 h-2.5 group-hover:hidden" />
-                        <span className="group-hover:hidden">Pago</span>
+                        <CheckCircle2 className="w-3 h-3 group-hover:hidden" />
+                        <span className="group-hover:hidden">✅ Pago</span>
                         <span className="hidden group-hover:inline">Desmarcar ↩</span>
                       </>
                     ) : (
@@ -443,12 +445,12 @@ export function HeroBentoGrid({
         </div>
       </motion.div>
 
-      {/* CARD 3: CAIXINHA NUBANK (115% CDI) & LUCRO FANTASMA (4 cols) */}
+      {/* CARD 3: CAIXINHA NUBANK (115% CDI) & LUCRO FANTASMA (3 cols) */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.2 }}
-        className="lg:col-span-3 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-5 flex flex-col justify-between shadow-xl backdrop-blur-md"
+        className="lg:col-span-3 rounded-3xl border border-zinc-800 bg-zinc-900/80 p-5 sm:p-6 flex flex-col justify-between shadow-xl backdrop-blur-md"
       >
         <div>
           {/* Nubank Caixinha Header */}
@@ -467,42 +469,42 @@ export function HeroBentoGrid({
           </div>
 
           {/* Balance & Edit Button */}
-          <div className="p-3 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 mb-3">
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-0.5">
+          <div className="p-3.5 rounded-2xl bg-zinc-950/70 border border-zinc-800/80 mb-3">
+            <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
               <span>Saldo Investido:</span>
               {onOpenUpdateCaixinha && (
                 <button
                   onClick={onOpenUpdateCaixinha}
-                  className="flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
+                  className="min-h-[36px] px-2 flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
                   title="Editar Saldo Total Manualmente"
                 >
-                  <Edit3 className="w-3 h-3" />
+                  <Edit3 className="w-3.5 h-3.5" />
                   <span>Editar Total</span>
                 </button>
               )}
             </div>
             <div className="flex items-baseline gap-1 text-purple-300 font-mono">
               <span className="text-xs">R$</span>
-              <span className="text-2xl font-black tracking-tight">
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight">
                 {summary.nubankCaixinhaBalance.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
             </div>
-            <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono mt-1 pt-1 border-t border-zinc-800/60">
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono mt-1.5 pt-1.5 border-t border-zinc-800/60">
               <span>Rende: +R$ {summary.nubankCaixinhaMonthlyYield.toFixed(2)}/mês</span>
               <span className="text-emerald-400 font-medium">(+R$ {summary.nubankCaixinhaDailyYield.toFixed(2)}/dia)</span>
             </div>
 
             {/* Quick Add Chips */}
-            <div className="mt-2.5 pt-2 border-t border-zinc-800/80">
-              <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1.5 font-medium">
+            <div className="mt-3 pt-2.5 border-t border-zinc-800/80">
+              <div className="flex items-center justify-between text-xs text-zinc-400 mb-2 font-medium">
                 <span>+ Adicionar na Caixinha:</span>
                 {onOpenDepositCaixinha && (
                   <button
                     onClick={onOpenDepositCaixinha}
-                    className="text-purple-400 hover:text-purple-300 hover:underline text-[10px] cursor-pointer"
+                    className="text-purple-400 hover:text-purple-300 hover:underline text-xs cursor-pointer py-1"
                   >
                     Outro valor...
                   </button>
@@ -514,7 +516,7 @@ export function HeroBentoGrid({
                     key={amt}
                     onClick={() => handleQuickDeposit(amt)}
                     disabled={quickDepositing !== null}
-                    className="py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 hover:text-purple-100 text-[11px] font-mono font-bold transition-all disabled:opacity-50 cursor-pointer text-center"
+                    className="min-h-[44px] py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/25 border border-purple-500/20 text-purple-300 hover:text-purple-100 text-xs font-mono font-bold transition-all disabled:opacity-50 cursor-pointer text-center"
                     title={`Adicionar R$ ${amt} imediatamente à Caixinha`}
                   >
                     {quickDepositing === amt ? '...' : `+R$ ${amt}`}
@@ -524,14 +526,14 @@ export function HeroBentoGrid({
             </div>
 
             {/* Direct Action Buttons: Pix Recebido & + Guardar */}
-            <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
               {onOpenReceivePix && (
                 <button
                   onClick={onOpenReceivePix}
-                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold transition-all cursor-pointer shadow-sm"
+                  className="min-h-[44px] flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-all cursor-pointer shadow-sm whitespace-nowrap"
                   title="Registrar dinheiro recebido externamente via Pix que vai para a Caixinha"
                 >
-                  <ArrowDownLeft className="w-3.5 h-3.5" />
+                  <ArrowDownLeft className="w-4 h-4 shrink-0" />
                   <span>Pix Recebido</span>
                 </button>
               )}
@@ -539,10 +541,10 @@ export function HeroBentoGrid({
               {onOpenDepositCaixinha && (
                 <button
                   onClick={onOpenDepositCaixinha}
-                  className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-200 text-[11px] font-semibold transition-all cursor-pointer shadow-sm"
+                  className="min-h-[44px] flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-200 text-xs font-semibold transition-all cursor-pointer shadow-sm whitespace-nowrap"
                   title="Guardar valor personalizado na Caixinha"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-4 h-4 shrink-0" />
                   <span>+ Guardar</span>
                 </button>
               )}
