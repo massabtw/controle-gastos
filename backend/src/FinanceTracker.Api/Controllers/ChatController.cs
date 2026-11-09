@@ -9,6 +9,7 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class ChatController : ControllerBase
 {
+    [HttpPost("command")]
     [HttpPost]
     public async Task<IActionResult> ProcessMessage(
         [FromServices] ICommandProcessorService service,

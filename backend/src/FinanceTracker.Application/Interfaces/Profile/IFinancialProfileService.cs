@@ -6,8 +6,9 @@ namespace FinanceTracker.Application.Interfaces.Profile;
 public interface IFinancialProfileService
 {
     Task<Result<FinancialProfileModel>> GetProfileAsync();
-    Task<Result<FinancialProfileModel>> UpdateProfileAsync(UpdateFinancialProfileModel model);
-    Task<Result<bool>> UpdateCaixinhaBalanceAsync(decimal balance);
-    Task<Result<decimal>> DepositCaixinhaAsync(decimal amount);
-    Task<Result<bool>> UpdateCardLimitAsync(UpdateCreditCardLimitModel model);
+    Task<Result<ProfileWithCommitmentsModel>> GetProfileWithCommitmentsAsync();
+    Task<Result<UpdateProfileResultModel>> UpdateProfileAsync(UpdateFinancialProfileModel model);
+    Task<Result<CaixinhaOperationResultModel>> UpdateCaixinhaBalanceAsync(decimal balance);
+    Task<Result<CaixinhaOperationResultModel>> DepositCaixinhaAsync(decimal amount);
+    Task<Result<UpdateCardLimitResultModel>> UpdateCardLimitAsync(UpdateCreditCardLimitModel model);
 }

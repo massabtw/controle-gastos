@@ -1,7 +1,6 @@
 using FinanceTracker.Application.Interfaces.FinancialEngine;
 using FinanceTracker.Application.Mappers;
 using FinanceTracker.Application.Models;
-using FinanceTracker.Domain.Entities;
 using FinanceTracker.Domain.Results;
 using FinanceTracker.Domain.Services;
 using FinanceTracker.Domain.UnitOfWorks;
@@ -29,76 +28,158 @@ public class FinancialEngineService : IFinancialEngineService
             var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
             var now = DateTime.Now;
 
-            var activeBillingCycle = BillingCycleCalculator.GetTargetBillingCycle(now, profile.ClosingDay);
-            var inspectedCycle = targetCycle ?? activeBillingCycle;
+            var currentActiveCycle = BillingCycleCalculator.GetTargetBillingCycle(now, profile.ClosingDay);
+            var inspectedCycle = string.IsNullOrWhiteSpace(targetCycle) ? currentActiveCycle : targetCycle;
 
             var (closingDate, dueDate) = BillingCycleCalculator.GetCycleDates(inspectedCycle, profile.ClosingDay, profile.DueDay);
             var (cycleStartDate, cycleEndDate) = BillingCycleCalculator.GetCyclePeriod(inspectedCycle, profile.ClosingDay);
 
-            var daysUntilClosing = BillingCycleCalculator.GetDaysUntilClosing(now, profile.ClosingDay, inspectedCycle);
-
-            var cycleExpensesEntities = (await _unitOfWork.CardExpense.GetByCycleAsync(inspectedCycle)).ToList();
-
-            var currentInvoiceTotal = cycleExpensesEntities
-                .Where(e => e.PaymentMethod == "CARD")
-                .Sum(e => e.Amount);
-
-            var pixCaixinhaUsedInCycle = cycleExpensesEntities
-                .Where(e => e.PaymentMethod == "PIX_CAIXINHA" && e.DeductFromCycleCap)
-                .Sum(e => e.Amount);
-
-            var totalSpentInCycle = currentInvoiceTotal + pixCaixinhaUsedInCycle;
+            var cycleComparison = string.CompareOrdinal(inspectedCycle, currentActiveCycle);
+            var cycleState = cycleComparison < 0 ? "CLOSED" : (cycleComparison > 0 ? "FUTURE" : "CURRENT");
 
             var allCommitments = (await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: true)).ToList();
-            var activeCommitmentsForCycle = new List<ActiveCommitmentModel>();
-            decimal fixedCommitmentsTotal = 0.00m;
+            var activeFixedCommitmentsList = new List<ActiveCommitmentModel>();
+            var activeSubscriptionsList = new List<ActiveCommitmentModel>();
+            var activeCommitmentsMerged = new List<ActiveCommitmentModel>();
+            decimal totalFixedCommitments = 0m;
+            decimal cardSubscriptionsTotal = 0m;
 
             foreach (var commitment in allCommitments)
             {
-                var status = BillingCycleCalculator.GetCommitmentInstallmentStatus(commitment, inspectedCycle);
-                if (status != null)
+                var isSubscription = string.Equals(commitment.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase);
+
+                if (isSubscription)
                 {
-                    activeCommitmentsForCycle.Add(commitment.ToActiveModel(status, inspectedCycle));
-
-                    var countsTowardsCap = commitment.CommitmentType != "SUBSCRIPTION" ||
-                        string.IsNullOrWhiteSpace(commitment.PaymentSource) ||
-                        commitment.PaymentSource == "CARD" ||
-                        commitment.PaymentSource == "PIX_CAIXINHA";
-
-                    if (countsTowardsCap)
+                    // Subscriptions only take effect from their StartCycle onwards.
+                    if (!string.IsNullOrWhiteSpace(commitment.StartCycle) &&
+                        string.CompareOrdinal(inspectedCycle, commitment.StartCycle) < 0)
                     {
-                        fixedCommitmentsTotal += commitment.Amount;
+                        continue;
+                    }
+
+                    var subModel = commitment.ToActiveModel("Mensal", inspectedCycle);
+                    subModel.CommitmentType = "SUBSCRIPTION";
+                    subModel.PaymentSource = string.IsNullOrWhiteSpace(commitment.PaymentSource) ? "CARD" : commitment.PaymentSource;
+                    activeSubscriptionsList.Add(subModel);
+                    activeCommitmentsMerged.Add(subModel);
+
+                    if (string.Equals(subModel.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cardSubscriptionsTotal += commitment.Amount;
+                    }
+                }
+                else
+                {
+                    var badge = BillingCycleCalculator.GetCommitmentInstallmentStatus(commitment, inspectedCycle);
+                    if (badge != null)
+                    {
+                        var fixedModel = commitment.ToActiveModel(badge, inspectedCycle);
+                        fixedModel.CommitmentType = "PIX_COMMITMENT";
+                        fixedModel.PaymentSource = string.IsNullOrWhiteSpace(commitment.PaymentSource) ? "PIX_CAIXINHA" : commitment.PaymentSource;
+                        activeFixedCommitmentsList.Add(fixedModel);
+                        activeCommitmentsMerged.Add(fixedModel);
+                        totalFixedCommitments += commitment.Amount;
                     }
                 }
             }
 
-            var monthlySpendingCap = profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0
+            // Hard Cap Formula: TotalIncome - InvestmentGoal - TotalFixedCommitments
+            var totalIncome = profile.TotalIncome;
+            var formulaHardCap = totalIncome - profile.MonthlyInvestmentGoal - totalFixedCommitments;
+            var cardHardCap = (profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0)
                 ? profile.CustomCardCap.Value
-                : Math.Max(0, profile.TotalIncome - profile.MonthlyInvestmentGoal - fixedCommitmentsTotal);
+                : formulaHardCap;
 
-            var remainingBudget = monthlySpendingCap - totalSpentInCycle;
-            var availablePerDay = daysUntilClosing > 0 ? remainingBudget / daysUntilClosing : 0;
+            // Expenses in target cycle
+            var cycleExpensesEntities = (await _unitOfWork.CardExpense.GetByCycleAsync(inspectedCycle)).ToList();
+            var manualCardExpensesTotal = cycleExpensesEntities.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
+            var currentInvoiceTotal = manualCardExpensesTotal + cardSubscriptionsTotal;
+            var pixCaixinhaUsedInCycle = cycleExpensesEntities.Where(e => e.PaymentMethod == "PIX_CAIXINHA" && e.DeductFromCycleCap).Sum(e => e.Amount);
+            var totalSpentInCycle = currentInvoiceTotal + pixCaixinhaUsedInCycle;
+            var remainingBudget = cardHardCap - currentInvoiceTotal - pixCaixinhaUsedInCycle;
 
-            var totalCycleDays = Math.Max(1, (cycleEndDate.Date - cycleStartDate.Date).Days);
-            var daysElapsed = Math.Clamp((now.Date - cycleStartDate.Date).Days, 0, totalCycleDays);
-            var idealBurnPacePercent = (decimal)daysElapsed / totalCycleDays * 100.0m;
-            var burnPacePercent = monthlySpendingCap > 0 ? (totalSpentInCycle / monthlySpendingCap) * 100.0m : 0;
+            var daysUntilClosing = BillingCycleCalculator.GetDaysUntilClosing(now, profile.ClosingDay, inspectedCycle);
+            var availablePerDay = (daysUntilClosing > 0 && remainingBudget > 0)
+                ? Math.Round(remainingBudget / daysUntilClosing, 2)
+                : 0m;
 
-            var totalInstallmentsOnCard = await _unitOfWork.CardExpense.GetFutureCommittedInstallmentsTotalAsync(inspectedCycle);
-            var bankLimitAvailable = Math.Max(0, profile.CreditCardLimit - (currentInvoiceTotal + totalInstallmentsOnCard));
+            // Status calculation
+            string status;
+            if (remainingBudget < 0)
+            {
+                status = "INVADING_INVESTMENT";
+            }
+            else if (availablePerDay < 20m && cycleState == "CURRENT")
+            {
+                status = "WARNING";
+            }
+            else
+            {
+                status = "HEALTHY";
+            }
 
-            var effectiveAnnualRate = (profile.CdiAnnualRate * (profile.NubankCaixinhaCdiRate / 100.0m)) / 100.0m;
-            var monthlyRate = (decimal)(Math.Pow((double)(1.0m + effectiveAnnualRate), 1.0 / 12.0) - 1.0);
-            var caixinhaMonthlyYield = profile.NubankCaixinhaBalance * monthlyRate;
-            var caixinhaDailyYield = caixinhaMonthlyYield / 30.0m;
+            // CDI Yield: Monthly CDI rate = (CdiAnnualRate / 100) / 12
+            var monthlyCdiRate = (profile.CdiAnnualRate / 100m) / 12m;
+            var phantomYieldEstimate = Math.Round(currentInvoiceTotal * monthlyCdiRate, 2);
+            var phantomYieldFullCap = Math.Round(Math.Max(0, cardHardCap) * monthlyCdiRate, 2);
+
+            // Nubank Caixinha (115% CDI) Yield
+            var caixinhaCdiRate = profile.NubankCaixinhaCdiRate > 0 ? profile.NubankCaixinhaCdiRate : 115.00m;
+            var caixinhaEffectiveAnnual = Math.Round(profile.CdiAnnualRate * (caixinhaCdiRate / 100m), 2);
+            var caixinhaMonthlyRate = (caixinhaEffectiveAnnual / 100m) / 12m;
+            var caixinhaMonthlyYield = Math.Round(profile.NubankCaixinhaBalance * caixinhaMonthlyRate, 2);
+            var caixinhaDailyYield = Math.Round(caixinhaMonthlyYield / 30m, 2);
             var projectedBalanceWithGoal = profile.NubankCaixinhaBalance + profile.MonthlyInvestmentGoal + caixinhaMonthlyYield;
 
+            // Spending Pace calculation
+            var totalDaysInCycle = Math.Max(1, (cycleEndDate.Date - cycleStartDate.Date).Days);
+            var daysElapsed = Math.Clamp((now.Date - cycleStartDate.Date).Days, 0, totalDaysInCycle);
+            var idealDailyBudget = totalDaysInCycle > 0 ? (cardHardCap / totalDaysInCycle) : 0m;
+            var idealPaceAmount = Math.Round(idealDailyBudget * daysElapsed, 2);
+            var paceDiff = currentInvoiceTotal - idealPaceAmount;
+            var paceStatus = paceDiff < -50m ? "AHEAD" : (paceDiff > 50m ? "OVERPACED" : "ON_TRACK");
+            var idealBurnPacePercent = (decimal)daysElapsed / totalDaysInCycle * 100.0m;
+            var burnPacePercent = cardHardCap > 0 ? (totalSpentInCycle / cardHardCap) * 100.0m : 0m;
+
+            // Invoice Paid & 2nd Tranche Salary Status
             var invoicePayment = await _unitOfWork.InvoicePayment.GetByCycleAsync(inspectedCycle);
             var isInvoicePaid = invoicePayment != null && invoicePayment.IsPaid;
-            var invoicePaidAmount = invoicePayment?.PaidAmount ?? 0m;
-            var invoiceSurplusAmount = isInvoicePaid ? (invoicePayment?.SurplusAmount ?? Math.Max(0, profile.IncomeSecondTranche - invoicePaidAmount)) : 0m;
-            var isSurplusInvested = invoicePayment != null && invoicePayment.SurplusInvested;
-            var invoicePaidAt = invoicePayment?.PaidAt;
+            var invoicePaidAmount = (isInvoicePaid && invoicePayment != null) ? invoicePayment.PaidAmount : 0m;
+            var invoicePaidAt = (isInvoicePaid && invoicePayment != null) ? invoicePayment.PaidAt : (DateTime?)null;
+            var secondTrancheAmount = profile.IncomeSecondTranche;
+            var secondTrancheSurplus = (isInvoicePaid && invoicePayment != null)
+                ? invoicePayment.SurplusAmount
+                : Math.Max(0, secondTrancheAmount - currentInvoiceTotal);
+            var isSurplusInvested = isInvoicePaid && (invoicePayment?.SurplusInvested ?? false);
+
+            // Available Bank Credit Limit
+            var bankLimit = profile.CreditCardLimit > 0 ? profile.CreditCardLimit : 2500.00m;
+            var allCommittedCardExpenses = await _unitOfWork.CardExpense.GetTotalCommittedCardExpensesFromCycleAsync(inspectedCycle);
+            var totalFutureInstallmentsOnCard = await _unitOfWork.CardExpense.GetFutureCommittedInstallmentsTotalAsync(inspectedCycle);
+            var committedToDeduct = isInvoicePaid ? Math.Max(0, allCommittedCardExpenses - manualCardExpensesTotal) : allCommittedCardExpenses;
+            var availableBankCreditLimit = Math.Max(0, bankLimit - committedToDeduct - cardSubscriptionsTotal);
+
+            // Category breakdown (include subscriptions category)
+            var allCardItems = cycleExpensesEntities
+                .Where(e => e.PaymentMethod != "PIX_INFLOW")
+                .Select(e => new { e.Category, e.Amount })
+                .ToList();
+
+            foreach (var sub in activeSubscriptionsList.Where(s => s.PaymentSource == "CARD"))
+            {
+                allCardItems.Add(new { Category = "Assinaturas", sub.Amount });
+            }
+
+            var categoryGroups = allCardItems
+                .GroupBy(e => string.IsNullOrWhiteSpace(e.Category) ? "Outros" : e.Category)
+                .Select(g => new CategoryBreakdownModel
+                {
+                    Category = g.Key,
+                    Amount = g.Sum(e => e.Amount),
+                    Percentage = currentInvoiceTotal > 0 ? Math.Round((g.Sum(e => e.Amount) / currentInvoiceTotal) * 100m, 1) : 0m
+                })
+                .OrderByDescending(c => c.Amount)
+                .ToList();
 
             var dailyBurnHistory = cycleExpensesEntities
                 .Where(e => e.PaymentMethod != "PIX_INFLOW")
@@ -111,94 +192,90 @@ public class FinancialEngineService : IFinancialEngineService
                 })
                 .ToList();
 
-            var futureInstallmentsByCycle = await _unitOfWork.CardExpense.GetFutureCommittedInstallmentsByCycleAsync(inspectedCycle, 6);
-            var futureProjections = new List<FutureCycleProjectionModel>();
-
-            for (var m = 1; m <= 6; m++)
-            {
-                var cycleKey = BillingCycleCalculator.AddMonthsToCycle(inspectedCycle, m);
-                futureInstallmentsByCycle.TryGetValue(cycleKey, out var commInstallments);
-
-                decimal futureFixed = 0.00m;
-                foreach (var c in allCommitments)
-                {
-                    if (BillingCycleCalculator.GetCommitmentInstallmentStatus(c, cycleKey) != null)
-                    {
-                        var countsTowardsCap = c.CommitmentType != "SUBSCRIPTION" ||
-                            string.IsNullOrWhiteSpace(c.PaymentSource) ||
-                            c.PaymentSource == "CARD" ||
-                            c.PaymentSource == "PIX_CAIXINHA";
-
-                        if (countsTowardsCap)
-                        {
-                            futureFixed += c.Amount;
-                        }
-                    }
-                }
-
-                var futureSpendingCap = profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0
-                    ? profile.CustomCardCap.Value
-                    : Math.Max(0, profile.TotalIncome - profile.MonthlyInvestmentGoal - futureFixed);
-
-                var totalExpected = commInstallments;
-                var remaining = futureSpendingCap - totalExpected;
-
-                futureProjections.Add(new FutureCycleProjectionModel
-                {
-                    Cycle = cycleKey,
-                    CommittedInstallments = commInstallments,
-                    FixedCommitments = futureFixed,
-                    TotalExpected = totalExpected,
-                    SafeSpendingCap = futureSpendingCap,
-                    RemainingAvailable = remaining
-                });
-            }
+            var projectionsResult = await GetProjectionsAsync(6);
+            var futureProjections = projectionsResult.IsSuccess && projectionsResult.Value != null
+                ? projectionsResult.Value.ToList()
+                : new List<FutureCycleProjectionModel>();
 
             var recentEntities = (await _unitOfWork.CardExpense.GetRecentAsync(15)).ToList();
 
-            var summary = new DashboardSummaryModel
+            return new DashboardSummaryModel
             {
+                BillingCycle = inspectedCycle,
+                CurrentActiveCycle = currentActiveCycle,
                 CurrentBillingCycle = inspectedCycle,
                 CycleClosingDate = closingDate,
                 CycleDueDate = dueDate,
+                CycleState = cycleState,
                 DaysUntilClosing = daysUntilClosing,
 
-                TotalIncome = profile.TotalIncome,
+                TotalIncome = totalIncome,
+                IncomeFirstTranche = profile.IncomeFirstTranche,
+                IncomeSecondTranche = profile.IncomeSecondTranche,
                 MonthlyInvestmentGoal = profile.MonthlyInvestmentGoal,
-                FixedCommitmentsTotal = fixedCommitmentsTotal,
-                MonthlySpendingCap = monthlySpendingCap,
 
-                CreditCardBankLimit = profile.CreditCardLimit,
-                TotalInstallmentsOnCard = totalInstallmentsOnCard,
-                BankLimitAvailable = bankLimitAvailable,
+                CreditCardLimit = bankLimit,
+                CustomCardCap = profile.CustomCardCap,
+                AvailableBankCreditLimit = availableBankCreditLimit,
+                CreditCardBankLimit = bankLimit,
+                TotalInstallmentsOnCard = totalFutureInstallmentsOnCard,
+                BankLimitAvailable = availableBankCreditLimit,
                 CustomCardCapOverride = profile.CustomCardCap,
+
+                ActiveFixedCommitments = activeFixedCommitmentsList,
+                TotalFixedCommitments = totalFixedCommitments,
+                FixedCommitmentsTotal = totalFixedCommitments,
+
+                ActiveSubscriptions = activeSubscriptionsList,
+                CardSubscriptionsTotal = cardSubscriptionsTotal,
+
+                CardHardCap = cardHardCap,
+                CardHardCapFormula = formulaHardCap,
+                MonthlySpendingCap = cardHardCap,
 
                 TotalSpentInCycle = totalSpentInCycle,
                 CurrentInvoiceTotal = currentInvoiceTotal,
                 PixCaixinhaUsedInCycle = pixCaixinhaUsedInCycle,
                 RemainingBudget = remainingBudget,
                 AvailablePerDay = availablePerDay,
-                BurnPacePercent = burnPacePercent,
-                IdealBurnPacePercent = idealBurnPacePercent,
 
+                Status = status,
+                CdiAnnualRate = profile.CdiAnnualRate,
+                PhantomYieldEstimate = phantomYieldEstimate,
+                PhantomYieldFullCap = phantomYieldFullCap,
+
+                NubankCaixinhaBalance = profile.NubankCaixinhaBalance,
+                NubankCaixinhaCdiRate = caixinhaCdiRate,
+                NubankCaixinhaEffectiveAnnualRate = caixinhaEffectiveAnnual,
+                NubankCaixinhaMonthlyYield = caixinhaMonthlyYield,
+                NubankCaixinhaDailyYield = caixinhaDailyYield,
                 CaixinhaInvestedBalance = profile.NubankCaixinhaBalance,
                 CaixinhaMonthlyYield = caixinhaMonthlyYield,
                 CaixinhaDailyYield = caixinhaDailyYield,
                 ProjectedBalanceWithGoal = projectedBalanceWithGoal,
 
-                IsInvoicePaid = isInvoicePaid,
-                InvoicePaidAmount = invoicePaidAmount,
-                InvoiceSurplusAmount = invoiceSurplusAmount,
-                IsSurplusInvested = isSurplusInvested,
-                InvoicePaidAt = invoicePaidAt,
+                DaysElapsed = daysElapsed,
+                TotalDaysInCycle = totalDaysInCycle,
+                IdealPaceAmount = idealPaceAmount,
+                PaceStatus = paceStatus,
+                PaceDifference = paceDiff,
+                BurnPacePercent = burnPacePercent,
+                IdealBurnPacePercent = idealBurnPacePercent,
 
+                IsInvoicePaid = isInvoicePaid,
+                InvoicePaidAt = invoicePaidAt,
+                InvoicePaidAmount = invoicePaidAmount,
+                SecondTrancheAmount = secondTrancheAmount,
+                SecondTrancheSurplus = secondTrancheSurplus,
+                InvoiceSurplusAmount = secondTrancheSurplus,
+                IsSurplusInvested = isSurplusInvested,
+
+                CategoryBreakdown = categoryGroups,
                 RecentExpenses = recentEntities.ToModel().ToList(),
-                ActiveCommitments = activeCommitmentsForCycle,
+                ActiveCommitments = activeCommitmentsMerged,
                 DailyBurnHistory = dailyBurnHistory,
                 FutureProjections = futureProjections
             };
-
-            return summary;
         }
         catch (Exception ex)
         {
@@ -207,94 +284,163 @@ public class FinancialEngineService : IFinancialEngineService
         }
     }
 
+    public async Task<Result<IEnumerable<FutureCycleProjectionModel>>> GetProjectionsAsync(int months = 6)
+    {
+        try
+        {
+            var clampedMonths = Math.Clamp(months, 1, 24);
+            var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
+            var currentActiveCycle = BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
+            var allCommitments = (await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: true)).ToList();
+
+            var cycles = new List<string>();
+            for (var i = 0; i < clampedMonths; i++)
+            {
+                cycles.Add(BillingCycleCalculator.AddMonthsToCycle(currentActiveCycle, i));
+            }
+
+            var allExpensesInCycles = (await _unitOfWork.CardExpense.GetExpensesInCyclesAsync(cycles)).ToList();
+            var projections = new List<FutureCycleProjectionModel>();
+
+            foreach (var cycle in cycles)
+            {
+                decimal fixedCommitmentsTotal = 0m;
+                foreach (var commitment in allCommitments.Where(c => !string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var badge = BillingCycleCalculator.GetCommitmentInstallmentStatus(commitment, cycle);
+                    if (badge != null)
+                    {
+                        fixedCommitmentsTotal += commitment.Amount;
+                    }
+                }
+
+                var cardSubscriptionsInCycle = allCommitments
+                    .Where(c => string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(c.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase) &&
+                                (string.IsNullOrWhiteSpace(c.StartCycle) || string.CompareOrdinal(cycle, c.StartCycle) >= 0))
+                    .Sum(c => c.Amount);
+
+                var cardInstallments = allExpensesInCycles
+                    .Where(e => e.BillingCycle == cycle && e.PaymentMethod == "CARD")
+                    .Sum(e => e.Amount) + cardSubscriptionsInCycle;
+
+                var baseCap = (profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0)
+                    ? profile.CustomCardCap.Value
+                    : (profile.TotalIncome - profile.MonthlyInvestmentGoal - fixedCommitmentsTotal);
+
+                var projectedFreeCap = baseCap - cardInstallments;
+                var projectedDailyBurnRate = Math.Round(projectedFreeCap / 30m, 2);
+
+                projections.Add(new FutureCycleProjectionModel
+                {
+                    BillingCycle = cycle,
+                    Cycle = cycle,
+                    FixedCommitmentsTotal = fixedCommitmentsTotal,
+                    FixedCommitments = fixedCommitmentsTotal,
+                    CommittedCardInstallments = cardInstallments,
+                    CommittedInstallments = cardInstallments,
+                    ProjectedFreeCap = projectedFreeCap,
+                    ProjectedDailyBurnRate = projectedDailyBurnRate,
+                    TotalExpected = cardInstallments,
+                    SafeSpendingCap = baseCap,
+                    RemainingAvailable = projectedFreeCap
+                });
+            }
+
+            return Result<IEnumerable<FutureCycleProjectionModel>>.Success(projections);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating projections for {Months} months", months);
+            return ErrorMessages.UnknownError;
+        }
+    }
+
     public async Task<Result<SimulatorResultModel>> SimulatePurchaseAsync(SimulatorRequestModel request)
     {
         try
         {
-            var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
-            var targetCycle = request.TargetCycle ?? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
-
             var installments = Math.Max(1, request.Installments);
             var installmentValue = Math.Round(request.Amount / installments, 2);
 
-            var allCommitments = (await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: true)).ToList();
-            var futureInstallmentsByCycle = await _unitOfWork.CardExpense.GetFutureCommittedInstallmentsByCycleAsync(targetCycle, installments + 2);
+            var dashboardResult = await GetDashboardSummaryAsync(request.TargetCycle);
+            if (!dashboardResult.IsSuccess || dashboardResult.Value == null)
+            {
+                return ErrorMessages.UnknownError;
+            }
 
-            var monthlyImpacts = new List<SimulatorMonthImpactModel>();
+            var dashboard = dashboardResult.Value;
+            var currentDailyBefore = dashboard.AvailablePerDay;
+            var remainingBudgetBefore = dashboard.RemainingBudget;
+            var remainingBudgetAfter = remainingBudgetBefore - installmentValue;
+
+            var willInvade = remainingBudgetAfter < 0;
+            var invadedAmount = willInvade ? Math.Abs(remainingBudgetAfter) : 0m;
+
+            var currentDailyAfter = (dashboard.DaysUntilClosing > 0 && remainingBudgetAfter > 0)
+                ? Math.Round(remainingBudgetAfter / dashboard.DaysUntilClosing, 2)
+                : 0m;
+
+            var projectionsResult = await GetProjectionsAsync(Math.Max(6, installments));
+            var projections = projectionsResult.IsSuccess && projectionsResult.Value != null
+                ? projectionsResult.Value.ToList()
+                : new List<FutureCycleProjectionModel>();
+
+            var affectedCycles = new List<SimulatorMonthImpactModel>();
             var allMonthsViable = true;
 
             for (var i = 0; i < installments; i++)
             {
-                var cycle = BillingCycleCalculator.AddMonthsToCycle(targetCycle, i);
+                var cycle = BillingCycleCalculator.AddMonthsToCycle(dashboard.BillingCycle, i);
+                var proj = projections.FirstOrDefault(p => p.BillingCycle == cycle);
+                var freeCapBefore = proj?.ProjectedFreeCap ?? 0m;
+                var freeCapAfter = freeCapBefore - installmentValue;
+                var cycleWillInvade = freeCapAfter < 0;
 
-                decimal fixedTotal = 0.00m;
-                foreach (var c in allCommitments)
-                {
-                    if (BillingCycleCalculator.GetCommitmentInstallmentStatus(c, cycle) != null)
-                    {
-                        var countsTowardsCap = c.CommitmentType != "SUBSCRIPTION" ||
-                            string.IsNullOrWhiteSpace(c.PaymentSource) ||
-                            c.PaymentSource == "CARD" ||
-                            c.PaymentSource == "PIX_CAIXINHA";
-
-                        if (countsTowardsCap)
-                        {
-                            fixedTotal += c.Amount;
-                        }
-                    }
-                }
-
-                var cap = profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0
-                    ? profile.CustomCardCap.Value
-                    : Math.Max(0, profile.TotalIncome - profile.MonthlyInvestmentGoal - fixedTotal);
-
-                futureInstallmentsByCycle.TryGetValue(cycle, out var committedInst);
-
-                var totalCommitted = committedInst + installmentValue;
-                var remaining = cap - totalCommitted;
-                var exceeds = remaining < 0;
-
-                if (exceeds)
+                if (cycleWillInvade)
                 {
                     allMonthsViable = false;
                 }
 
-                monthlyImpacts.Add(new SimulatorMonthImpactModel
+                affectedCycles.Add(new SimulatorMonthImpactModel
                 {
+                    BillingCycle = cycle,
                     Cycle = cycle,
-                    MonthlySpendingCap = cap,
-                    AlreadyCommittedInstallments = committedInst,
-                    FixedCommitments = fixedTotal,
+                    ProjectedFreeCapBefore = freeCapBefore,
+                    ProjectedFreeCapAfter = freeCapAfter,
+                    InstallmentAmount = installmentValue,
+                    WillInvade = cycleWillInvade,
+                    MonthlySpendingCap = proj?.SafeSpendingCap ?? dashboard.CardHardCap,
+                    AlreadyCommittedInstallments = proj?.CommittedCardInstallments ?? 0m,
+                    FixedCommitments = proj?.FixedCommitmentsTotal ?? dashboard.TotalFixedCommitments,
                     SimulatedInstallment = installmentValue,
-                    TotalExpectedCommitment = totalCommitted,
-                    RemainingAvailableCap = remaining,
-                    ExceedsCap = exceeds
+                    TotalExpectedCommitment = (proj?.CommittedCardInstallments ?? 0m) + installmentValue,
+                    RemainingAvailableCap = freeCapAfter,
+                    ExceedsCap = cycleWillInvade
                 });
             }
 
-            var effectiveAnnualRate = (profile.CdiAnnualRate * (profile.NubankCaixinhaCdiRate / 100.0m)) / 100.0m;
-            var monthlyRate = (decimal)(Math.Pow((double)(1.0m + effectiveAnnualRate), 1.0 / 12.0) - 1.0);
-            var caixinhaMonthlyYield = profile.NubankCaixinhaBalance * monthlyRate;
-
-            string recommendation;
-            if (allMonthsViable)
-            {
-                recommendation = $"Compra viável! A parcela de R$ {installmentValue:F2} cabe no teto de todos os {installments} meses simulados sem comprometer a meta de investimento de R$ {profile.MonthlyInvestmentGoal:F2}.";
-            }
-            else
-            {
-                recommendation = $"Atenção: A parcela de R$ {installmentValue:F2} estoura o teto de gastos seguro em um ou mais meses futuros. Considere parcelar em mais vezes ou adiar a compra para não comprometer a meta de investimento.";
-            }
+            string recommendation = allMonthsViable
+                ? $"Compra viável! A parcela de R$ {installmentValue:F2} cabe no teto de todos os {installments} meses simulados sem comprometer a meta de investimento."
+                : $"Atenção: A parcela de R$ {installmentValue:F2} estoura o teto de gastos seguro em um ou mais meses. Considere parcelar em mais vezes ou adiar a compra.";
 
             return new SimulatorResultModel
             {
+                Amount = request.Amount,
                 TotalAmount = request.Amount,
                 Installments = installments,
                 InstallmentValue = installmentValue,
+                CurrentDailyBefore = currentDailyBefore,
+                CurrentDailyAfter = currentDailyAfter,
+                RemainingBudgetBefore = remainingBudgetBefore,
+                RemainingBudgetAfter = remainingBudgetAfter,
+                WillInvadeInvestmentGoal = willInvade,
+                InvadedAmount = invadedAmount,
+                AffectedCycles = affectedCycles,
                 IsViable = allMonthsViable,
                 Recommendation = recommendation,
-                CurrentCaixinhaYield = caixinhaMonthlyYield,
-                MonthlyImpacts = monthlyImpacts
+                CurrentCaixinhaYield = dashboard.NubankCaixinhaMonthlyYield,
+                MonthlyImpacts = affectedCycles
             };
         }
         catch (Exception ex)

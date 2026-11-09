@@ -18,12 +18,30 @@ public class InvoicesController : ControllerBase
         return result.Ok();
     }
 
+    [HttpPost("{cycle}/toggle-paid")]
+    public async Task<IActionResult> TogglePaidByRoute(
+        [FromServices] IInvoiceService service,
+        string cycle)
+    {
+        var result = await service.TogglePaymentAsync(cycle);
+        return result.Ok();
+    }
+
     [HttpPost("toggle-paid")]
     public async Task<IActionResult> TogglePaid(
         [FromServices] IInvoiceService service,
         [FromBody] MarkInvoicePaidModel model)
     {
         var result = await service.TogglePaymentAsync(model.Cycle);
+        return result.Ok();
+    }
+
+    [HttpPost("{cycle}/invest-surplus")]
+    public async Task<IActionResult> InvestSurplusByRoute(
+        [FromServices] IInvoiceService service,
+        string cycle)
+    {
+        var result = await service.InvestSurplusAsync(cycle);
         return result.Ok();
     }
 

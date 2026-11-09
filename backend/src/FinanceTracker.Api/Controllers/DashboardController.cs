@@ -16,4 +16,13 @@ public class DashboardController : ControllerBase
         var result = await service.GetDashboardSummaryAsync(cycle);
         return result.Ok();
     }
+
+    [HttpGet("projections")]
+    public async Task<IActionResult> GetProjections(
+        [FromServices] IFinancialEngineService service,
+        [FromQuery] int months = 6)
+    {
+        var result = await service.GetProjectionsAsync(months);
+        return result.Ok();
+    }
 }

@@ -14,7 +14,7 @@ public class ProfileController : ControllerBase
     public async Task<IActionResult> GetProfile(
         [FromServices] IFinancialProfileService service)
     {
-        var result = await service.GetProfileAsync();
+        var result = await service.GetProfileWithCommitmentsAsync();
         return result.Ok();
     }
 
@@ -27,6 +27,7 @@ public class ProfileController : ControllerBase
         return result.Ok();
     }
 
+    [HttpPatch("card-limit")]
     [HttpPut("card-limit")]
     public async Task<IActionResult> UpdateCardLimit(
         [FromServices] IFinancialProfileService service,
@@ -36,12 +37,13 @@ public class ProfileController : ControllerBase
         return result.Ok();
     }
 
+    [HttpPost("caixinha")]
     [HttpPut("caixinha")]
     public async Task<IActionResult> UpdateCaixinhaBalance(
         [FromServices] IFinancialProfileService service,
-        [FromBody] decimal balance)
+        [FromBody] UpdateCaixinhaBalanceModel model)
     {
-        var result = await service.UpdateCaixinhaBalanceAsync(balance);
+        var result = await service.UpdateCaixinhaBalanceAsync(model.Balance);
         return result.Ok();
     }
 
@@ -54,19 +56,51 @@ public class ProfileController : ControllerBase
         return result.Ok();
     }
 
+    [HttpPost("commitments")]
+    public async Task<IActionResult> AddCommitment(
+        [FromServices] IFixedCommitmentService commitmentService,
+        [FromBody] CreateFixedCommitmentModel model)
+    {
+        var result = await commitmentService.CreateAsync(model);
+        return result.Created();
+    }
+
+    [HttpPut("commitments/{id:int}")]
+    public async Task<IActionResult> UpdateCommitment(
+        [FromServices] IFixedCommitmentService commitmentService,
+        int id,
+        [FromBody] CreateFixedCommitmentModel model)
+    {
+        var result = await commitmentService.UpdateAsync(id, model);
+        return result.Ok();
+    }
+
+    [HttpDelete("commitments/{id:int}")]
+    public async Task<IActionResult> DeleteCommitment(
+        [FromServices] IFixedCommitmentService commitmentService,
+        int id)
+    {
+        var result = await commitmentService.DeleteAsync(id);
+        return result.Ok();
+    }
+
+    [HttpPost("commitments/{id:int}/toggle-paid")]
+    [HttpPost("commitments/{id:int}/pay-from-caixinha")]
+    public async Task<IActionResult> ToggleCommitmentPaid(
+        [FromServices] IFixedCommitmentService commitmentService,
+        int id,
+        [FromQuery] string? cycle = null)
+    {
+        var result = await commitmentService.TogglePaidAsync(id, cycle);
+        return result.Ok();
+    }
+
     [HttpGet("subscriptions")]
     public async Task<IActionResult> GetSubscriptions(
         [FromServices] IFixedCommitmentService commitmentService)
     {
-        var allResult = await commitmentService.GetAllAsync(onlyActive: true);
-        if (!allResult.IsSuccess || allResult.Value == null)
-            return allResult.Ok();
-
-        var subs = allResult.Value
-            .Where(c => c.CommitmentType == "SUBSCRIPTION")
-            .OrderBy(c => c.BillingDay ?? 1);
-
-        return Ok(subs);
+        var result = await commitmentService.GetSubscriptionsAsync();
+        return result.Ok();
     }
 
     [HttpPost("subscriptions")]
@@ -74,9 +108,7 @@ public class ProfileController : ControllerBase
         [FromServices] IFixedCommitmentService commitmentService,
         [FromBody] CreateFixedCommitmentModel model)
     {
-        model.CommitmentType = "SUBSCRIPTION";
-        model.TotalInstallments = null;
-        var result = await commitmentService.CreateAsync(model);
+        var result = await commitmentService.CreateSubscriptionAsync(model);
         return result.Created();
     }
 
@@ -86,6 +118,6 @@ public class ProfileController : ControllerBase
         int id)
     {
         var result = await commitmentService.DeleteAsync(id);
-        return result.NoContent();
+        return result.Ok();
     }
 }

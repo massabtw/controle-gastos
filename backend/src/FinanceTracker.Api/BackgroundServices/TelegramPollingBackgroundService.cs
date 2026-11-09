@@ -111,27 +111,6 @@ public class TelegramPollingBackgroundService : BackgroundService
                                     continue;
                                 }
 
-                                if (text.Trim().Equals("/start", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    var welcome = "👋 Olá! Sou o seu assistente financeiro do BurnTracker.\n" +
-                                                  "Aqui você controla seus gastos do cartão e saídas da caixinha em tempo real!\n\n" +
-                                                  "Comandos e exemplos que você pode mandar:\n" +
-                                                  "• Gasto Cartão: 'uber 25', 'almoço 34,90', 'teclado 300 3x'\n" +
-                                                  "• Pix Caixinha: 'pix 40 corte', 'paguei 25 no pix lanche'\n" +
-                                                  "• Receber Pix: 'recebi 50 pix do joao'\n" +
-                                                  "• Adicionar Caixinha: '+10 caixinha'\n" +
-                                                  "• Ajustar Fatura: 'fatura atual 350'\n" +
-                                                  "• Liquidar Fatura: 'paguei a fatura' ou '/pagarfatura'\n" +
-                                                  "• Reinvestir Sobra: 'investir sobra'\n" +
-                                                  "• Atualizar Caixinha: 'saldo caixinha 4500'\n" +
-                                                  "• Simulação: '/simular 300 3x'\n" +
-                                                  "• Resumo do Ciclo: '/status'\n" +
-                                                  "• Desfazer Último: '/desfazer'";
-
-                                    await _telegramService.SendMessageAsync(chatId, welcome);
-                                    continue;
-                                }
-
                                 using var scope = _serviceProvider.CreateScope();
                                 var cmdProcessor = scope.ServiceProvider.GetRequiredService<ICommandProcessorService>();
                                 var cmdResult = await cmdProcessor.ProcessCommandAsync(text);

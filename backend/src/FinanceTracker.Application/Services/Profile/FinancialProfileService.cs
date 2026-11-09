@@ -38,12 +38,32 @@ public class FinancialProfileService : IFinancialProfileService
         }
     }
 
-    public async Task<Result<FinancialProfileModel>> UpdateProfileAsync(UpdateFinancialProfileModel model)
+    public async Task<Result<ProfileWithCommitmentsModel>> GetProfileWithCommitmentsAsync()
+    {
+        try
+        {
+            var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
+            var commitments = await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: false);
+
+            return new ProfileWithCommitmentsModel
+            {
+                Profile = profile.ToModel(),
+                Commitments = commitments.ToModel().ToList()
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting financial profile with commitments");
+            return ErrorMessages.UnknownError;
+        }
+    }
+
+    public async Task<Result<UpdateProfileResultModel>> UpdateProfileAsync(UpdateFinancialProfileModel model)
     {
         var validation = await _validator.ValidateAsync(model);
         if (!validation.IsValid)
         {
-            return Result<FinancialProfileModel>.Failure(validation.Errors[0].ErrorMessage, 400);
+            return Result<UpdateProfileResultModel>.Failure(validation.Errors[0].ErrorMessage, 400);
         }
 
         try
@@ -53,10 +73,14 @@ public class FinancialProfileService : IFinancialProfileService
             var success = await _unitOfWork.FinancialProfile.UpdateProfileAsync(updated);
             if (!success)
             {
-                return Result<FinancialProfileModel>.Failure("Falha ao atualizar o perfil financeiro.");
+                return Result<UpdateProfileResultModel>.Failure("Falha ao atualizar o perfil financeiro.");
             }
 
-            return updated.ToModel();
+            return new UpdateProfileResultModel
+            {
+                Message = "Perfil atualizado com sucesso.",
+                Profile = updated.ToModel()
+            };
         }
         catch (Exception ex)
         {
@@ -65,17 +89,24 @@ public class FinancialProfileService : IFinancialProfileService
         }
     }
 
-    public async Task<Result<bool>> UpdateCaixinhaBalanceAsync(decimal balance)
+    public async Task<Result<CaixinhaOperationResultModel>> UpdateCaixinhaBalanceAsync(decimal balance)
     {
         if (balance < 0)
         {
-            return Result<bool>.Failure("O saldo da caixinha não pode ser negativo.", 400);
+            return Result<CaixinhaOperationResultModel>.Failure("O saldo da caixinha não pode ser negativo.", 400);
         }
 
         try
         {
             var success = await _unitOfWork.FinancialProfile.UpdateCaixinhaBalanceAsync(balance);
-            return success ? Result<bool>.Success(true) : Result<bool>.Failure("Falha ao atualizar saldo da caixinha.");
+            return success
+                ? new CaixinhaOperationResultModel
+                {
+                    Message = "Saldo da Caixinha atualizado com sucesso.",
+                    Balance = balance,
+                    Amount = balance
+                }
+                : Result<CaixinhaOperationResultModel>.Failure("Falha ao atualizar saldo da caixinha.");
         }
         catch (Exception ex)
         {
@@ -84,17 +115,22 @@ public class FinancialProfileService : IFinancialProfileService
         }
     }
 
-    public async Task<Result<decimal>> DepositCaixinhaAsync(decimal amount)
+    public async Task<Result<CaixinhaOperationResultModel>> DepositCaixinhaAsync(decimal amount)
     {
         if (amount <= 0)
         {
-            return Result<decimal>.Failure("O valor a adicionar deve ser maior que zero.", 400);
+            return Result<CaixinhaOperationResultModel>.Failure("O valor a adicionar deve ser maior que zero.", 400);
         }
 
         try
         {
             var newBalance = await _unitOfWork.FinancialProfile.DepositCaixinhaAsync(amount);
-            return Result<decimal>.Success(newBalance);
+            return new CaixinhaOperationResultModel
+            {
+                Message = $"R$ {amount:F2} adicionados à Caixinha com sucesso.",
+                Balance = newBalance,
+                Amount = amount
+            };
         }
         catch (Exception ex)
         {
@@ -103,17 +139,29 @@ public class FinancialProfileService : IFinancialProfileService
         }
     }
 
-    public async Task<Result<bool>> UpdateCardLimitAsync(UpdateCreditCardLimitModel model)
+    public async Task<Result<UpdateCardLimitResultModel>> UpdateCardLimitAsync(UpdateCreditCardLimitModel model)
     {
-        if (model.CreditCardLimit < 0)
+        if (model.CreditCardLimit <= 0)
         {
-            return Result<bool>.Failure("O limite do cartão não pode ser negativo.", 400);
+            return Result<UpdateCardLimitResultModel>.Failure("O limite do cartão deve ser maior que zero.", 400);
+        }
+
+        if (model.CustomCardCap.HasValue && model.CustomCardCap.Value <= 0)
+        {
+            model.CustomCardCap = null;
         }
 
         try
         {
             var success = await _unitOfWork.FinancialProfile.UpdateCardLimitAsync(model.CreditCardLimit, model.CustomCardCap);
-            return success ? Result<bool>.Success(true) : Result<bool>.Failure("Falha ao atualizar limites do cartão.");
+            return success
+                ? new UpdateCardLimitResultModel
+                {
+                    Message = "Limites do cartão atualizados com sucesso.",
+                    CreditCardLimit = model.CreditCardLimit,
+                    CustomCardCap = model.CustomCardCap
+                }
+                : Result<UpdateCardLimitResultModel>.Failure("Falha ao atualizar limites do cartão.");
         }
         catch (Exception ex)
         {

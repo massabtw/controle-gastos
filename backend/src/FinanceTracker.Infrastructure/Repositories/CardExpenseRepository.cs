@@ -46,6 +46,31 @@ public class CardExpenseRepository : ICardExpenseRepository
         return await _unitOfWork.Connection.QueryAsync<CardExpenseEntity>(sql, new { cycle }, _unitOfWork.Transaction);
     }
 
+    public async Task<IEnumerable<CardExpenseEntity>> GetByGroupIdAsync(Guid purchaseGroupId)
+    {
+        var sql = _unitOfWork.IsPostgres
+            ? @"SELECT * FROM CardExpenses 
+                WHERE PurchaseGroupId = @purchaseGroupId AND Deleted = FALSE
+                ORDER BY InstallmentCurrent ASC"
+            : @"SELECT * FROM CardExpenses 
+                WHERE PurchaseGroupId = @purchaseGroupId AND Deleted = 0
+                ORDER BY InstallmentCurrent ASC";
+
+        return await _unitOfWork.Connection.QueryAsync<CardExpenseEntity>(sql, new { purchaseGroupId }, _unitOfWork.Transaction);
+    }
+
+    public async Task<IEnumerable<CardExpenseEntity>> GetExpensesInCyclesAsync(IEnumerable<string> cycles)
+    {
+        var cycleArray = cycles.ToArray();
+        var sql = _unitOfWork.IsPostgres
+            ? @"SELECT * FROM CardExpenses 
+                WHERE BillingCycle = ANY(@cycleArray) AND Deleted = FALSE"
+            : @"SELECT * FROM CardExpenses 
+                WHERE BillingCycle IN @cycleArray AND Deleted = 0";
+
+        return await _unitOfWork.Connection.QueryAsync<CardExpenseEntity>(sql, new { cycleArray }, _unitOfWork.Transaction);
+    }
+
     public async Task<IEnumerable<CardExpenseEntity>> GetRecentAsync(int count = 10)
     {
         var sql = _unitOfWork.IsPostgres
@@ -120,6 +145,58 @@ public class CardExpenseRepository : ICardExpenseRepository
         await _unitOfWork.Connection.ExecuteAsync(sql, entities, _unitOfWork.Transaction);
     }
 
+    public async Task<bool> UpdateAsync(CardExpenseEntity entity)
+    {
+        var sql = _unitOfWork.IsPostgres
+            ? @"UPDATE CardExpenses
+                SET Description = @Description,
+                    Category = @Category,
+                    Amount = @Amount,
+                    TransactionDate = @TransactionDate,
+                    BillingCycle = @BillingCycle,
+                    InstallmentCurrent = @InstallmentCurrent,
+                    InstallmentTotal = @InstallmentTotal,
+                    PurchaseGroupId = @PurchaseGroupId,
+                    PaymentMethod = @PaymentMethod,
+                    DeductFromCycleCap = @DeductFromCycleCap,
+                    UpdatedAt = CURRENT_TIMESTAMP
+                WHERE Id = @Id AND Deleted = FALSE;"
+            : @"UPDATE CardExpenses
+                SET Description = @Description,
+                    Category = @Category,
+                    Amount = @Amount,
+                    TransactionDate = @TransactionDate,
+                    BillingCycle = @BillingCycle,
+                    InstallmentCurrent = @InstallmentCurrent,
+                    InstallmentTotal = @InstallmentTotal,
+                    PurchaseGroupId = @PurchaseGroupId,
+                    PaymentMethod = @PaymentMethod,
+                    DeductFromCycleCap = @DeductFromCycleCap,
+                    UpdatedAt = SYSDATETIMEOFFSET()
+                WHERE Id = @Id AND Deleted = 0;";
+
+        var affected = await _unitOfWork.Connection.ExecuteAsync(sql, entity, _unitOfWork.Transaction);
+        return affected > 0;
+    }
+
+    public async Task<bool> UpdateGroupDetailsAsync(Guid purchaseGroupId, string description, string category)
+    {
+        var sql = _unitOfWork.IsPostgres
+            ? @"UPDATE CardExpenses
+                SET Description = @description,
+                    Category = @category,
+                    UpdatedAt = CURRENT_TIMESTAMP
+                WHERE PurchaseGroupId = @purchaseGroupId AND Deleted = FALSE;"
+            : @"UPDATE CardExpenses
+                SET Description = @description,
+                    Category = @category,
+                    UpdatedAt = SYSDATETIMEOFFSET()
+                WHERE PurchaseGroupId = @purchaseGroupId AND Deleted = 0;";
+
+        var affected = await _unitOfWork.Connection.ExecuteAsync(sql, new { purchaseGroupId, description, category }, _unitOfWork.Transaction);
+        return affected > 0;
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var sql = _unitOfWork.IsPostgres
@@ -176,6 +253,23 @@ public class CardExpenseRepository : ICardExpenseRepository
                   AND Deleted = 0";
 
         return await _unitOfWork.Connection.ExecuteScalarAsync<decimal>(sql, new { targetCycle }, _unitOfWork.Transaction);
+    }
+
+    public async Task<decimal> GetTotalCommittedCardExpensesFromCycleAsync(string fromCycle)
+    {
+        var sql = _unitOfWork.IsPostgres
+            ? @"SELECT COALESCE(SUM(Amount), 0.00) 
+                FROM CardExpenses 
+                WHERE BillingCycle >= @fromCycle 
+                  AND PaymentMethod = 'CARD'
+                  AND Deleted = FALSE"
+            : @"SELECT ISNULL(SUM(Amount), 0.00) 
+                FROM CardExpenses 
+                WHERE BillingCycle >= @fromCycle 
+                  AND PaymentMethod = 'CARD'
+                  AND Deleted = 0";
+
+        return await _unitOfWork.Connection.ExecuteScalarAsync<decimal>(sql, new { fromCycle }, _unitOfWork.Transaction);
     }
 
     public async Task<Dictionary<string, decimal>> GetFutureCommittedInstallmentsByCycleAsync(string startCycle, int monthsAhead)

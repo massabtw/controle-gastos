@@ -33,19 +33,69 @@ public static class CardExpenseModelMap
     {
         return new CardExpenseEntity
         {
-            Description = model.Description,
-            Category = string.IsNullOrWhiteSpace(model.Category) ? "Outros" : model.Category,
+            Description = model.Description.Trim(),
+            Category = string.IsNullOrWhiteSpace(model.Category) ? "Outros" : model.Category.Trim(),
             Amount = model.Amount,
             TransactionDate = model.TransactionDate ?? DateTime.Now,
             BillingCycle = billingCycle,
             InstallmentCurrent = current,
             InstallmentTotal = total,
             PurchaseGroupId = groupId,
-            PaymentMethod = string.IsNullOrWhiteSpace(model.PaymentMethod) ? "CARD" : model.PaymentMethod,
+            PaymentMethod = string.IsNullOrWhiteSpace(model.PaymentMethod) ? "CARD" : model.PaymentMethod.ToUpperInvariant(),
             DeductFromCycleCap = model.DeductFromCycleCap ?? true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
             Deleted = false
         };
+    }
+
+    public static CardExpenseEntity ToEntity(this ReceivePixModel model, string billingCycle)
+    {
+        return new CardExpenseEntity
+        {
+            Description = string.IsNullOrWhiteSpace(model.Description) ? "Pix Recebido" : model.Description.Trim(),
+            Category = string.IsNullOrWhiteSpace(model.Category) ? "Entrada" : model.Category.Trim(),
+            Amount = model.Amount,
+            TransactionDate = model.TransactionDate ?? DateTime.Now,
+            BillingCycle = billingCycle,
+            InstallmentCurrent = 1,
+            InstallmentTotal = 1,
+            PurchaseGroupId = null,
+            PaymentMethod = "PIX_INFLOW",
+            DeductFromCycleCap = false,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Deleted = false
+        };
+    }
+
+    public static CardExpenseEntity ToInvoiceSyncEntity(decimal diff, string billingCycle)
+    {
+        return new CardExpenseEntity
+        {
+            Description = diff > 0 ? "Ajuste de Fatura (Nubank)" : "Ajuste de Fatura (Crédito/Estorno)",
+            Category = "Outros",
+            Amount = diff,
+            TransactionDate = DateTime.Now,
+            BillingCycle = billingCycle,
+            InstallmentCurrent = 1,
+            InstallmentTotal = 1,
+            PurchaseGroupId = null,
+            PaymentMethod = "CARD",
+            DeductFromCycleCap = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Deleted = false
+        };
+    }
+
+    public static void ApplyUpdate(this CardExpenseEntity existing, UpdateExpenseModel model, string targetCycle)
+    {
+        existing.Description = model.Description.Trim();
+        existing.Category = string.IsNullOrWhiteSpace(model.Category) ? "Outros" : model.Category.Trim();
+        existing.Amount = model.Amount;
+        existing.TransactionDate = model.TransactionDate;
+        existing.BillingCycle = targetCycle;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
     }
 }

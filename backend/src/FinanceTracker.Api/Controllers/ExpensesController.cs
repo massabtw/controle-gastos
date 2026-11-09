@@ -12,12 +12,18 @@ public class ExpensesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetExpenses(
         [FromServices] IExpenseService service,
-        [FromQuery] string cycle)
+        [FromQuery] string? cycle = null)
     {
-        if (string.IsNullOrWhiteSpace(cycle))
-            return BadRequest(new { message = "Parameter 'cycle' is required (format: YYYY-MM)." });
-
         var result = await service.GetExpensesByCycleAsync(cycle);
+        return result.Ok();
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetExpenseById(
+        [FromServices] IExpenseService service,
+        int id)
+    {
+        var result = await service.GetExpenseByIdAsync(id);
         return result.Ok();
     }
 
@@ -44,26 +50,45 @@ public class ExpensesController : ControllerBase
         [FromServices] IExpenseService service,
         [FromBody] CreateExpenseModel model)
     {
-        model.PaymentMethod = "PIX_CAIXINHA";
-        model.Installments = 1;
-        var result = await service.CreateExpenseAsync(model);
+        var result = await service.CreatePixCaixinhaExpenseAsync(model);
         return result.Created();
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateExpense(
+        [FromServices] IExpenseService service,
+        int id,
+        [FromBody] UpdateExpenseModel model)
+    {
+        var result = await service.UpdateExpenseAsync(id, model);
+        return result.Ok();
     }
 
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteExpense(
         [FromServices] IExpenseService service,
-        int id)
+        int id,
+        [FromQuery] bool deleteAllInstallments = false)
     {
-        var result = await service.DeleteExpenseAsync(id);
-        return result.NoContent();
+        var result = await service.DeleteExpenseAsync(id, deleteAllInstallments);
+        return result.Ok();
     }
 
+    [HttpPost("undo")]
     [HttpPost("undo-last")]
     public async Task<IActionResult> UndoLastExpense(
         [FromServices] IExpenseService service)
     {
         var result = await service.DeleteLastExpenseAsync();
+        return result.Ok();
+    }
+
+    [HttpPost("sync-invoice")]
+    public async Task<IActionResult> SyncInvoice(
+        [FromServices] IExpenseService service,
+        [FromBody] SyncInvoiceModel model)
+    {
+        var result = await service.SyncInvoiceAsync(model);
         return result.Ok();
     }
 }

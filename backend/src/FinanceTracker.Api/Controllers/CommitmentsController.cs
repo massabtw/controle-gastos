@@ -43,7 +43,7 @@ public class CommitmentsController : ControllerBase
         [FromBody] CreateFixedCommitmentModel model)
     {
         var result = await service.UpdateAsync(id, model);
-        return result.NoContent();
+        return result.Ok();
     }
 
     [HttpDelete("{id:int}")]
@@ -52,10 +52,11 @@ public class CommitmentsController : ControllerBase
         int id)
     {
         var result = await service.DeleteAsync(id);
-        return result.NoContent();
+        return result.Ok();
     }
 
     [HttpPost("{id:int}/toggle-paid")]
+    [HttpPost("{id:int}/pay-from-caixinha")]
     public async Task<IActionResult> TogglePaid(
         [FromServices] IFixedCommitmentService service,
         int id,

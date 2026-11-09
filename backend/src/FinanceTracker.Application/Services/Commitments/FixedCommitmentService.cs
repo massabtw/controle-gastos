@@ -39,6 +39,24 @@ public class FixedCommitmentService : IFixedCommitmentService
         }
     }
 
+    public async Task<Result<IEnumerable<FixedCommitmentModel>>> GetSubscriptionsAsync()
+    {
+        try
+        {
+            var entities = await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: true);
+            var subs = entities
+                .Where(c => string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.BillingDay ?? 1)
+                .ToModel();
+            return Result<IEnumerable<FixedCommitmentModel>>.Success(subs);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting subscriptions");
+            return ErrorMessages.UnknownError;
+        }
+    }
+
     public async Task<Result<FixedCommitmentModel>> GetByIdAsync(int id)
     {
         try
@@ -83,14 +101,15 @@ public class FixedCommitmentService : IFixedCommitmentService
         }
     }
 
-    public async Task<Result<bool>> UpdateAsync(int id, CreateFixedCommitmentModel model)
+    public async Task<Result<FixedCommitmentModel>> CreateSubscriptionAsync(CreateFixedCommitmentModel model)
     {
-        var validation = await _validator.ValidateAsync(model);
-        if (!validation.IsValid)
-        {
-            return Result<bool>.Failure(validation.Errors[0].ErrorMessage, 400);
-        }
+        model.CommitmentType = "SUBSCRIPTION";
+        model.TotalInstallments = null;
+        return await CreateAsync(model);
+    }
 
+    public async Task<Result<MessageResponseModel>> UpdateAsync(int id, CreateFixedCommitmentModel model)
+    {
         try
         {
             var existing = await _unitOfWork.FixedCommitment.GetByIdAsync(id);
@@ -99,18 +118,12 @@ public class FixedCommitmentService : IFixedCommitmentService
                 return ErrorMessages.EntityNotFound;
             }
 
-            existing.Title = model.Title;
-            existing.Amount = model.Amount;
-            if (!string.IsNullOrWhiteSpace(model.StartCycle))
-                existing.StartCycle = model.StartCycle;
-            existing.TotalInstallments = model.TotalInstallments;
-            existing.CommitmentType = model.CommitmentType ?? existing.CommitmentType;
-            existing.PaymentSource = model.PaymentSource ?? existing.PaymentSource;
-            existing.BillingDay = model.BillingDay ?? existing.BillingDay;
-            existing.UpdatedAt = DateTimeOffset.UtcNow;
+            existing.ApplyUpdate(model);
 
             var success = await _unitOfWork.FixedCommitment.UpdateAsync(existing);
-            return success ? Result<bool>.Success(true) : Result<bool>.Failure("Falha ao atualizar compromisso.");
+            return success
+                ? new MessageResponseModel { Message = "Compromisso atualizado com sucesso." }
+                : Result<MessageResponseModel>.Failure("Falha ao atualizar compromisso.");
         }
         catch (Exception ex)
         {
@@ -119,12 +132,14 @@ public class FixedCommitmentService : IFixedCommitmentService
         }
     }
 
-    public async Task<Result<bool>> DeleteAsync(int id)
+    public async Task<Result<MessageResponseModel>> DeleteAsync(int id)
     {
         try
         {
             var success = await _unitOfWork.FixedCommitment.DeleteAsync(id);
-            return success ? Result<bool>.Success(true) : ErrorMessages.EntityNotFound;
+            return success
+                ? new MessageResponseModel { Message = "Compromisso removido com sucesso." }
+                : ErrorMessages.EntityNotFound;
         }
         catch (Exception ex)
         {
@@ -133,29 +148,32 @@ public class FixedCommitmentService : IFixedCommitmentService
         }
     }
 
-    public async Task<Result<object>> TogglePaidAsync(int id, string? cycle)
+    public async Task<Result<TogglePaidResultModel>> TogglePaidAsync(int id, string? cycle)
     {
         try
         {
             var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
-            var targetCycle = cycle ?? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
+            var targetCycle = string.IsNullOrWhiteSpace(cycle)
+                ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
+                : cycle;
 
             var (success, isPaid, balanceAfter) = await _unitOfWork.FixedCommitment.ToggleCommitmentPaidAsync(id, targetCycle);
             if (!success)
             {
-                return Result<object>.Failure("Compromisso não encontrado ou inativo.", 404);
+                return Result<TogglePaidResultModel>.Failure("Compromisso não encontrado ou inativo.", 404);
             }
 
-            return Result<object>.Success(new
+            return new TogglePaidResultModel
             {
-                success = true,
-                isPaid,
-                targetCycle,
-                newCaixinhaBalance = balanceAfter,
-                message = isPaid
+                IsPaid = isPaid,
+                Cycle = targetCycle,
+                TargetCycle = targetCycle,
+                BalanceAfter = balanceAfter,
+                NewCaixinhaBalance = balanceAfter,
+                Message = isPaid
                     ? $"Compromisso marcado como pago no ciclo {targetCycle}. Saldo deduzido da Caixinha."
                     : $"Compromisso desmarcado como pago. Saldo estornado para a Caixinha."
-            });
+            };
         }
         catch (Exception ex)
         {

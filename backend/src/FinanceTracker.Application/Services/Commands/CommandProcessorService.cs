@@ -41,11 +41,35 @@ public class CommandProcessorService : ICommandProcessorService
     {
         try
         {
-            var parsed = await _groqService.ParseExpenseIntentAsync(input);
+            if (string.Equals(input?.Trim(), "/start", StringComparison.OrdinalIgnoreCase))
+            {
+                return new CommandResponseModel
+                {
+                    Success = true,
+                    Intent = "START",
+                    Reply = "👋 Olá! Sou o seu assistente financeiro do BurnTracker.\n" +
+                            "Aqui você controla seus gastos do cartão e saídas da caixinha em tempo real!\n\n" +
+                            "Comandos e exemplos que você pode mandar:\n" +
+                            "• Gasto Cartão: 'uber 25', 'almoço 34,90', 'teclado 300 3x'\n" +
+                            "• Pix Caixinha: 'pix 40 corte', 'paguei 25 no pix lanche'\n" +
+                            "• Receber Pix: 'recebi 50 pix do joao'\n" +
+                            "• Adicionar Caixinha: '+10 caixinha'\n" +
+                            "• Ajustar Fatura: 'fatura atual 350'\n" +
+                            "• Liquidar Fatura: 'paguei a fatura' ou '/pagarfatura'\n" +
+                            "• Reinvestir Sobra: 'investir sobra'\n" +
+                            "• Atualizar Caixinha: 'saldo caixinha 4500'\n" +
+                            "• Simulação: '/simular 300 3x'\n" +
+                            "• Resumo do Ciclo: '/status'\n" +
+                            "• Desfazer Último: '/desfazer'"
+                };
+            }
+
+            var safeInput = input ?? string.Empty;
+            var parsed = await _groqService.ParseExpenseIntentAsync(safeInput);
 
             if (parsed == null || parsed.Intent == "UNKNOWN" || parsed.Confidence < 0.6m)
             {
-                parsed = RegexExpenseParser.Parse(input);
+                parsed = RegexExpenseParser.Parse(safeInput);
             }
 
             return parsed.Intent switch
@@ -86,6 +110,7 @@ public class CommandProcessorService : ICommandProcessorService
         {
             Description = parsed.Description,
             Amount = parsed.Amount,
+            TotalAmount = parsed.Amount,
             Category = parsed.Category,
             Installments = parsed.Installments,
             PaymentMethod = parsed.PaymentMethod,
@@ -104,7 +129,7 @@ public class CommandProcessorService : ICommandProcessorService
 
         var dashboardResult = await _financialEngineService.GetDashboardSummaryAsync();
         var reply = parsed.PaymentMethod == "PIX_CAIXINHA"
-            ? $"🐷 *Pix da Caixinha Registrado!*\n• Item: {parsed.Description}\n• Valor: R$ {parsed.Amount:F2}\n• Saldo Caixinha Atual: R$ {dashboardResult.Value?.CaixinhaInvestedBalance:F2}\n• Teto restante: R$ {dashboardResult.Value?.RemainingBudget:F2}"
+            ? $"🐷 *Pix da Caixinha Registrado!*\n• Item: {parsed.Description}\n• Valor: R$ {parsed.Amount:F2}\n• Saldo Caixinha Atual: R$ {dashboardResult.Value?.NubankCaixinhaBalance:F2}\n• Teto restante: R$ {dashboardResult.Value?.RemainingBudget:F2}"
             : (parsed.Installments > 1
                 ? $"💳 *Compra Parcelada Registrada!*\n• Item: {parsed.Description}\n• Total: R$ {parsed.Amount:F2} em {parsed.Installments}x de R$ {(parsed.Amount / parsed.Installments):F2}\n• Fatura atual: R$ {dashboardResult.Value?.CurrentInvoiceTotal:F2}"
                 : $"💳 *Despesa Registrada!*\n• Item: {parsed.Description}\n• Valor: R$ {parsed.Amount:F2}\n• Categoria: {parsed.Category}\n• Fatura atual: R$ {dashboardResult.Value?.CurrentInvoiceTotal:F2}");
@@ -114,6 +139,7 @@ public class CommandProcessorService : ICommandProcessorService
             Success = true,
             Intent = "ADD_EXPENSE",
             Reply = reply,
+            Dashboard = dashboardResult.Value,
             Data = result.Value
         };
     }
@@ -142,7 +168,8 @@ public class CommandProcessorService : ICommandProcessorService
         {
             Success = true,
             Intent = "RECEIVE_PIX",
-            Reply = $"💰 *Pix Externo Recebido!*\n• Descrição: {parsed.Description}\n• Valor: +R$ {parsed.Amount:F2}\n• Novo Saldo na Caixinha: R$ {dashboardResult.Value?.CaixinhaInvestedBalance:F2} (115% CDI rendendo!)",
+            Reply = $"💰 *Pix Externo Recebido!*\n• Descrição: {parsed.Description}\n• Valor: +R$ {parsed.Amount:F2}\n• Novo Saldo na Caixinha: R$ {dashboardResult.Value?.NubankCaixinhaBalance:F2} (115% CDI rendendo!)",
+            Dashboard = dashboardResult.Value,
             Data = result.Value
         };
     }
@@ -150,7 +177,7 @@ public class CommandProcessorService : ICommandProcessorService
     private async Task<CommandResponseModel> HandleDepositCaixinhaAsync(ParsedExpenseIntentModel parsed)
     {
         var result = await _profileService.DepositCaixinhaAsync(parsed.Amount);
-        if (!result.IsSuccess)
+        if (!result.IsSuccess || result.Value == null)
         {
             return new CommandResponseModel
             {
@@ -160,12 +187,14 @@ public class CommandProcessorService : ICommandProcessorService
             };
         }
 
+        var dash = await _financialEngineService.GetDashboardSummaryAsync();
         return new CommandResponseModel
         {
             Success = true,
             Intent = "DEPOSIT_CAIXINHA",
-            Reply = $"🐷 *Caixinha Abastecida!*\n• Adicionado: +R$ {parsed.Amount:F2}\n• Saldo atualizado: R$ {result.Value:F2}",
-            Data = new { newBalance = result.Value }
+            Reply = $"🐷 *Caixinha Abastecida!*\n• Adicionado: +R$ {parsed.Amount:F2}\n• Saldo atualizado: R$ {result.Value.Balance:F2}",
+            Dashboard = dash.Value,
+            Data = result.Value
         };
     }
 
@@ -178,16 +207,16 @@ public class CommandProcessorService : ICommandProcessorService
         }
 
         var s = summaryResult.Value;
-        var reply = $"📊 *Resumo Financeiro - Ciclo {s.CurrentBillingCycle}*\n\n" +
+        var reply = $"📊 *Resumo Financeiro - Ciclo {s.BillingCycle}*\n\n" +
                     $"💳 *Cartão de Crédito:*\n" +
                     $"• Fatura atual: R$ {s.CurrentInvoiceTotal:F2}\n" +
-                    $"• Teto do ciclo: R$ {s.MonthlySpendingCap:F2}\n" +
+                    $"• Teto do ciclo: R$ {s.CardHardCap:F2}\n" +
                     $"• Restante no teto: R$ {s.RemainingBudget:F2}\n" +
                     $"• Disponível por dia ({s.DaysUntilClosing}d restantes): R$ {s.AvailablePerDay:F2}/dia\n\n" +
                     $"🐷 *Nubank Caixinha (115% CDI):*\n" +
-                    $"• Saldo investido: R$ {s.CaixinhaInvestedBalance:F2}\n" +
-                    $"• Rendimento diário estimado: R$ {s.CaixinhaDailyYield:F2}/dia\n" +
-                    $"• Rendimento mensal estimado: R$ {s.CaixinhaMonthlyYield:F2}/mês\n\n" +
+                    $"• Saldo investido: R$ {s.NubankCaixinhaBalance:F2}\n" +
+                    $"• Rendimento diário estimado: R$ {s.NubankCaixinhaDailyYield:F2}/dia\n" +
+                    $"• Rendimento mensal estimado: R$ {s.NubankCaixinhaMonthlyYield:F2}/mês\n\n" +
                     $"🎯 Meta de Aporte Mensal: R$ {s.MonthlyInvestmentGoal:F2}";
 
         return new CommandResponseModel
@@ -195,6 +224,7 @@ public class CommandProcessorService : ICommandProcessorService
             Success = true,
             Intent = "STATUS",
             Reply = reply,
+            Dashboard = s,
             Data = s
         };
     }
@@ -213,8 +243,10 @@ public class CommandProcessorService : ICommandProcessorService
         }
 
         var sim = simResult.Value;
+        var dash = await _financialEngineService.GetDashboardSummaryAsync();
         var reply = $"🔍 *Simulação de Compra*\n" +
-                    $"• Valor: R$ {sim.TotalAmount:F2} em {sim.Installments}x de R$ {sim.InstallmentValue:F2}\n" +
+                    $"• Valor: R$ {sim.Amount:F2} em {sim.Installments}x de R$ {sim.InstallmentValue:F2}\n" +
+                    $"• Limite diário: de R$ {sim.CurrentDailyBefore:F2} para R$ {sim.CurrentDailyAfter:F2}/dia\n" +
                     $"• Veredito: {(sim.IsViable ? "✅ VIÁVEL" : "⚠️ ATENÇÃO")}\n" +
                     $"• {sim.Recommendation}";
 
@@ -223,6 +255,7 @@ public class CommandProcessorService : ICommandProcessorService
             Success = true,
             Intent = "SIMULATE",
             Reply = reply,
+            Dashboard = dash.Value,
             Data = sim
         };
     }
@@ -230,7 +263,7 @@ public class CommandProcessorService : ICommandProcessorService
     private async Task<CommandResponseModel> HandleUndoAsync()
     {
         var result = await _expenseService.DeleteLastExpenseAsync();
-        if (!result.IsSuccess)
+        if (!result.IsSuccess || result.Value == null)
         {
             return new CommandResponseModel { Success = false, Intent = "UNDO", Reply = result.Error ?? "Nenhuma despesa recente para desfazer." };
         }
@@ -240,23 +273,26 @@ public class CommandProcessorService : ICommandProcessorService
         {
             Success = true,
             Intent = "UNDO",
-            Reply = $"🗑️ Último gasto desfeito com sucesso!\n• Fatura atual: R$ {dash.Value?.CurrentInvoiceTotal:F2}\n• Saldo Caixinha: R$ {dash.Value?.CaixinhaInvestedBalance:F2}"
+            Reply = $"🗑️ {result.Value.Message}\n• Fatura atual: R$ {dash.Value?.CurrentInvoiceTotal:F2}\n• Saldo Caixinha: R$ {dash.Value?.NubankCaixinhaBalance:F2}",
+            Dashboard = dash.Value
         };
     }
 
     private async Task<CommandResponseModel> HandlePayInvoiceAsync()
     {
         var result = await _invoiceService.TogglePaymentAsync(null);
-        if (!result.IsSuccess)
+        if (!result.IsSuccess || result.Value == null)
         {
             return new CommandResponseModel { Success = false, Intent = "PAY_INVOICE", Reply = result.Error ?? "Erro ao alterar status da fatura." };
         }
 
+        var dash = await _financialEngineService.GetDashboardSummaryAsync();
         return new CommandResponseModel
         {
             Success = true,
             Intent = "PAY_INVOICE",
-            Reply = "✅ Fatura atualizada!",
+            Reply = $"✅ {result.Value.Message}",
+            Dashboard = dash.Value,
             Data = result.Value
         };
     }
@@ -264,54 +300,38 @@ public class CommandProcessorService : ICommandProcessorService
     private async Task<CommandResponseModel> HandleInvestSurplusAsync()
     {
         var result = await _invoiceService.InvestSurplusAsync(null);
-        if (!result.IsSuccess)
+        if (!result.IsSuccess || result.Value == null)
         {
             return new CommandResponseModel { Success = false, Intent = "INVEST_SURPLUS", Reply = result.Error ?? "Erro ao investir sobra da fatura." };
         }
 
+        var dash = await _financialEngineService.GetDashboardSummaryAsync();
         return new CommandResponseModel
         {
             Success = true,
             Intent = "INVEST_SURPLUS",
-            Reply = "🎉 Sobra reinvestida com sucesso na Caixinha!",
+            Reply = $"🎉 {result.Value.Message}",
+            Dashboard = dash.Value,
             Data = result.Value
         };
     }
 
     private async Task<CommandResponseModel> HandleSyncInvoiceAsync(ParsedExpenseIntentModel parsed)
     {
+        var syncResult = await _expenseService.SyncInvoiceAsync(new SyncInvoiceModel { TargetTotal = parsed.Amount });
+        if (!syncResult.IsSuccess || syncResult.Value == null)
+        {
+            return new CommandResponseModel { Success = false, Intent = "SYNC_INVOICE", Reply = syncResult.Error ?? "Erro ao sincronizar fatura." };
+        }
+
         var dash = await _financialEngineService.GetDashboardSummaryAsync();
-        if (dash.Value == null)
-        {
-            return new CommandResponseModel { Success = false, Intent = "SYNC_INVOICE", Reply = "Erro ao ler dados da fatura." };
-        }
-
-        var diff = parsed.Amount - dash.Value.CurrentInvoiceTotal;
-        if (Math.Abs(diff) < 0.01m)
-        {
-            return new CommandResponseModel
-            {
-                Success = true,
-                Intent = "SYNC_INVOICE",
-                Reply = $"A fatura já está exatamente no valor de R$ {parsed.Amount:F2}."
-            };
-        }
-
-        var createResult = await _expenseService.CreateExpenseAsync(new CreateExpenseModel
-        {
-            Description = "Ajuste Sincronização Fatura",
-            Amount = diff,
-            Category = "Ajuste",
-            Installments = 1,
-            PaymentMethod = "CARD"
-        });
-
         return new CommandResponseModel
         {
             Success = true,
             Intent = "SYNC_INVOICE",
-            Reply = $"🔄 Fatura sincronizada com sucesso para R$ {parsed.Amount:F2}! (Ajuste de R$ {diff:F2} registrado)",
-            Data = createResult.Value
+            Reply = $"🔄 Fatura sincronizada com sucesso para R$ {parsed.Amount:F2}!",
+            Dashboard = dash.Value,
+            Data = syncResult.Value
         };
     }
 
@@ -323,11 +343,13 @@ public class CommandProcessorService : ICommandProcessorService
             return new CommandResponseModel { Success = false, Intent = "UPDATE_CAIXINHA", Reply = "Erro ao atualizar saldo da Caixinha." };
         }
 
+        var dash = await _financialEngineService.GetDashboardSummaryAsync();
         return new CommandResponseModel
         {
             Success = true,
             Intent = "UPDATE_CAIXINHA",
-            Reply = $"🐷 Saldo da Caixinha atualizado para R$ {parsed.Amount:F2}!"
+            Reply = $"🐷 Saldo da Caixinha atualizado para R$ {parsed.Amount:F2}!",
+            Dashboard = dash.Value
         };
     }
 }

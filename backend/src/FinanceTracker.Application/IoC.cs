@@ -1,3 +1,4 @@
+using System.Globalization;
 using FinanceTracker.Application.Interfaces.Commands;
 using FinanceTracker.Application.Interfaces.Commitments;
 using FinanceTracker.Application.Interfaces.Expenses;
@@ -21,6 +22,7 @@ public static class IoC
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("pt-BR");
         services.AddValidatorsFromAssembly(typeof(IoC).Assembly);
 
         services.AddTransient<IExpenseService, ExpenseService>();

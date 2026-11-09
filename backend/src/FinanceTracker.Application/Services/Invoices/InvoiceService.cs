@@ -26,7 +26,9 @@ public class InvoiceService : IInvoiceService
         try
         {
             var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
-            var targetCycle = cycle ?? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
+            var targetCycle = string.IsNullOrWhiteSpace(cycle)
+                ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
+                : cycle;
 
             var entity = await _unitOfWork.InvoicePayment.GetByCycleAsync(targetCycle);
             return entity != null ? entity.ToModel() : Result<InvoicePaymentModel?>.Success(null);
@@ -38,31 +40,40 @@ public class InvoiceService : IInvoiceService
         }
     }
 
-    public async Task<Result<object>> TogglePaymentAsync(string? cycle)
+    public async Task<Result<InvoiceTogglePaidResultModel>> TogglePaymentAsync(string? cycle)
     {
         try
         {
             var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
-            var targetCycle = cycle ?? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
+            var targetCycle = string.IsNullOrWhiteSpace(cycle)
+                ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
+                : cycle;
 
             var expenses = await _unitOfWork.CardExpense.GetByCycleAsync(targetCycle);
-            var currentInvoiceTotal = expenses.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
+            var allCommitments = await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: true);
+            var cardSubscriptionsTotal = allCommitments
+                .Where(c => string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(c.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase) &&
+                            (string.IsNullOrWhiteSpace(c.StartCycle) || string.CompareOrdinal(targetCycle, c.StartCycle) >= 0))
+                .Sum(c => c.Amount);
+
+            var currentInvoiceTotal = expenses.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount) + cardSubscriptionsTotal;
 
             var (isPaid, paidAmount, surplusAmount, surplusInvested, paidAt) =
                 await _unitOfWork.InvoicePayment.TogglePaymentAsync(targetCycle, currentInvoiceTotal, profile.IncomeSecondTranche);
 
-            return Result<object>.Success(new
+            return new InvoiceTogglePaidResultModel
             {
-                cycle = targetCycle,
-                isPaid,
-                paidAmount,
-                surplusAmount,
-                surplusInvested,
-                paidAt,
-                message = isPaid
+                Cycle = targetCycle,
+                IsPaid = isPaid,
+                PaidAmount = paidAmount,
+                SurplusAmount = surplusAmount,
+                SurplusInvested = surplusInvested,
+                PaidAt = paidAt,
+                Message = isPaid
                     ? $"Fatura do ciclo {targetCycle} marcada como PAGA! (Valor: R$ {paidAmount:F2}, Sobra do Salário: R$ {surplusAmount:F2})"
                     : $"Fatura do ciclo {targetCycle} desmarcada. Status retornado para pendente."
-            });
+            };
         }
         catch (Exception ex)
         {
@@ -71,28 +82,31 @@ public class InvoiceService : IInvoiceService
         }
     }
 
-    public async Task<Result<object>> InvestSurplusAsync(string? cycle)
+    public async Task<Result<InvestSurplusResultModel>> InvestSurplusAsync(string? cycle)
     {
         try
         {
             var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
-            var targetCycle = cycle ?? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
+            var targetCycle = string.IsNullOrWhiteSpace(cycle)
+                ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
+                : cycle;
 
             var (success, surplusInvestedAmount, newCaixinhaBalance) =
                 await _unitOfWork.InvoicePayment.InvestSurplusAsync(targetCycle);
 
             if (!success)
             {
-                return Result<object>.Failure("Fatura ainda não está marcada como paga ou não há sobra para investir.", 400);
+                return Result<InvestSurplusResultModel>.Failure("Fatura ainda não está marcada como paga ou não há sobra para investir.", 400);
             }
 
-            return Result<object>.Success(new
+            return new InvestSurplusResultModel
             {
-                cycle = targetCycle,
-                surplusInvestedAmount,
-                newCaixinhaBalance,
-                message = $"Sobra de R$ {surplusInvestedAmount:F2} transferida e investida com sucesso na Caixinha! Novo saldo: R$ {newCaixinhaBalance:F2}."
-            });
+                Cycle = targetCycle,
+                InvestedAmount = surplusInvestedAmount,
+                SurplusInvestedAmount = surplusInvestedAmount,
+                NewCaixinhaBalance = newCaixinhaBalance,
+                Message = $"Sobra de R$ {surplusInvestedAmount:F2} transferida e investida com sucesso na Caixinha! Novo saldo: R$ {newCaixinhaBalance:F2}."
+            };
         }
         catch (Exception ex)
         {
