@@ -1,16 +1,18 @@
 using System.Data;
 using FinanceTracker.Domain.UnitOfWorks;
 using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace FinanceTracker.Infrastructure.UnitOfWorks;
 
-public abstract class UnitOfWork<TDbConnection> : IUnitOfWork where TDbConnection : class, IDbConnection, new()
+public abstract class UnitOfWork : IUnitOfWork
 {
-    private TDbConnection? _connection;
+    private IDbConnection? _connection;
     private IDbTransaction? _transaction;
     private bool _disposed;
 
     public string? ConnectionString { get; protected set; }
+    public bool IsPostgres { get; protected set; }
 
     public IDbConnection Connection
     {
@@ -18,7 +20,7 @@ public abstract class UnitOfWork<TDbConnection> : IUnitOfWork where TDbConnectio
         {
             if (_connection == null)
             {
-                _connection = new TDbConnection { ConnectionString = ConnectionString };
+                _connection = CreateConnection();
                 _connection.Open();
             }
             else if (_connection.State != ConnectionState.Open)
@@ -28,6 +30,15 @@ public abstract class UnitOfWork<TDbConnection> : IUnitOfWork where TDbConnectio
 
             return _connection;
         }
+    }
+
+    protected virtual IDbConnection CreateConnection()
+    {
+        if (IsPostgres)
+        {
+            return new NpgsqlConnection(ConnectionString);
+        }
+        return new SqlConnection(ConnectionString);
     }
 
     public IDbTransaction? Transaction => _transaction;

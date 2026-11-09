@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft, Lock } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeaderProps {
@@ -13,6 +13,7 @@ interface HeaderProps {
   onOpenReceivePix?: () => void;
   onOpenSyncInvoice?: () => void;
   onOpenSettings: () => void;
+  onOpenPinModal?: () => void;
 }
 
 export function Header({
@@ -24,6 +25,7 @@ export function Header({
   onOpenReceivePix,
   onOpenSyncInvoice,
   onOpenSettings,
+  onOpenPinModal,
 }: HeaderProps) {
   // Helper to step cycles
   const handlePrevCycle = () => {
@@ -157,6 +159,17 @@ export function Header({
           >
             <CreditCard className="w-4 h-4 text-purple-400" />
             <span className="hidden sm:inline">Ajustar Fatura</span>
+          </button>
+        )}
+
+        {onOpenPinModal && (
+          <button
+            onClick={onOpenPinModal}
+            title="Configurar PIN de Segurança"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-sm font-medium transition-colors shadow-sm cursor-pointer"
+          >
+            <Lock className="w-4 h-4 text-zinc-400" />
+            <span className="hidden sm:inline">PIN</span>
           </button>
         )}
 

@@ -1,9 +1,17 @@
 using FinanceTracker.Api.BackgroundServices;
+using FinanceTracker.Api.Middlewares;
 using FinanceTracker.Application;
 using FinanceTracker.Infrastructure;
 using FinanceTracker.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure port for Render / Docker if PORT env var is present
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(port))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
 
 // Controllers & JSON configuration
 builder.Services.AddControllers()
@@ -23,14 +31,15 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpClient();
 builder.Services.AddHostedService<TelegramPollingBackgroundService>();
 
-// CORS configuration for Frontend (Next.js localhost:3000)
+// CORS configuration (Allows Vercel domains, localhost, and all preview URLs)
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
+    options.AddPolicy("AllowAll", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://127.0.0.1:3000")
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -42,13 +51,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowFrontend");
+app.UseCors("AllowAll");
+
+// Security: PIN Protection for writes if APP_PIN is set
+app.UseMiddleware<PinProtectionMiddleware>();
 
 app.UseAuthorization();
 
 app.MapControllers();
 
-// Database Migration on startup
+// Database Migration on startup (PostgreSQL Neon auto-init or SQL Server)
 try
 {
     using var scope = app.Services.CreateScope();
@@ -58,6 +70,30 @@ try
 catch (Exception ex)
 {
     app.Logger.LogWarning(ex, "Could not run database migrations.");
+}
+
+// Auto-register Telegram Webhook if deployed on Render or with public URL
+var publicBaseUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL")
+    ?? Environment.GetEnvironmentVariable("PUBLIC_BASE_URL");
+
+if (!string.IsNullOrWhiteSpace(publicBaseUrl))
+{
+    try
+    {
+        var botToken = builder.Configuration["Telegram:BotToken"];
+        if (!string.IsNullOrWhiteSpace(botToken))
+        {
+            using var http = new HttpClient();
+            var webhookUrl = $"{publicBaseUrl.TrimEnd('/')}/api/telegram/webhook";
+            var setWebhookEndpoint = $"https://api.telegram.org/bot{botToken}/setWebhook?url={Uri.EscapeDataString(webhookUrl)}";
+            var resp = await http.PostAsync(setWebhookEndpoint, null);
+            app.Logger.LogInformation("Telegram Webhook auto-registration to {WebhookUrl}: {Status}", webhookUrl, resp.StatusCode);
+        }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Failed to auto-register Telegram webhook.");
+    }
 }
 
 app.Run();

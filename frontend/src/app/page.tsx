@@ -21,6 +21,7 @@ import {
   NewSubscriptionModal,
   DepositCaixinhaModal,
   ReceivePixModal,
+  PinModal,
 } from '@/components/Modals';
 
 export default function Home() {
@@ -43,6 +44,26 @@ export default function Home() {
   const [isPixCaixinhaOpen, setIsPixCaixinhaOpen] = useState(false);
   const [isEditCardLimitOpen, setIsEditCardLimitOpen] = useState(false);
   const [isNewSubscriptionOpen, setIsNewSubscriptionOpen] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isServerWakingUp, setIsServerWakingUp] = useState(false);
+
+  useEffect(() => {
+    const handleWakingUp = (e: Event) => {
+      const customEvent = e as CustomEvent<boolean>;
+      setIsServerWakingUp(Boolean(customEvent.detail));
+    };
+    const handlePinRequired = () => {
+      setIsPinModalOpen(true);
+    };
+
+    window.addEventListener('render_server_waking_up', handleWakingUp);
+    window.addEventListener('finance_app_pin_required', handlePinRequired);
+
+    return () => {
+      window.removeEventListener('render_server_waking_up', handleWakingUp);
+      window.removeEventListener('finance_app_pin_required', handlePinRequired);
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -94,7 +115,18 @@ export default function Home() {
           onOpenReceivePix={() => setIsReceivePixOpen(true)}
           onOpenSyncInvoice={() => setIsSyncInvoiceOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenPinModal={() => setIsPinModalOpen(true)}
         />
+
+        {/* Cloud Server Wake-up Notice (Render Free Tier Cold Start) */}
+        {isServerWakingUp && (
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3.5 text-amber-200 text-xs sm:text-sm animate-pulse shadow-lg shadow-amber-500/5">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 animate-ping" />
+            <div className="flex-1">
+              <span className="font-bold">Servidor em nuvem acordando...</span> Aguarde alguns instantes enquanto a instância gratuita do Render inicia. Seus dados estão seguros e o painel atualizará automaticamente.
+            </div>
+          </div>
+        )}
 
         {/* AI Quick Command Bar */}
         <QuickCommandBar onRefresh={loadData} />
@@ -265,6 +297,12 @@ export default function Home() {
         activeCycle={summary?.currentActiveCycle || summary?.billingCycle}
         currentCycle={summary?.currentActiveCycle || summary?.billingCycle}
         onClose={() => setIsNewSubscriptionOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <PinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
         onSuccess={loadData}
       />
     </div>

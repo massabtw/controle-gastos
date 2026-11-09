@@ -31,6 +31,15 @@ public class TelegramPollingBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var publicUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL")
+            ?? Environment.GetEnvironmentVariable("PUBLIC_BASE_URL");
+
+        if (!string.IsNullOrWhiteSpace(publicUrl))
+        {
+            _logger.LogInformation("Public URL detected ({PublicUrl}). Telegram Webhook mode is active; polling service will stay idle.", publicUrl);
+            return;
+        }
+
         var botToken = _configuration["Telegram:BotToken"];
         if (string.IsNullOrWhiteSpace(botToken))
         {

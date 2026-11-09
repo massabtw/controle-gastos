@@ -5,10 +5,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace FinanceTracker.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api")]
 public class SystemController : ControllerBase
 {
-    [HttpGet("status")]
+    [HttpGet("ping")]
+    public IActionResult Ping()
+    {
+        return Ok(new { status = "pong", timestamp = DateTime.UtcNow });
+    }
+
+    [HttpGet("system/status")]
     public async Task<IActionResult> GetStatus(
         [FromServices] ISystemService service)
     {

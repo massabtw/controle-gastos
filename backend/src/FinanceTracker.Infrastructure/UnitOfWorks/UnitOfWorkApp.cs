@@ -1,12 +1,12 @@
 using FinanceTracker.Domain.Repositories;
 using FinanceTracker.Domain.UnitOfWorks;
+using FinanceTracker.Infrastructure.Data;
 using FinanceTracker.Infrastructure.Repositories;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 
 namespace FinanceTracker.Infrastructure.UnitOfWorks;
 
-public class UnitOfWorkApp : UnitOfWork<SqlConnection>, IUnitOfWorkApp
+public class UnitOfWorkApp : UnitOfWork, IUnitOfWorkApp
 {
     private ICardExpenseRepository? _cardExpense;
     private IFinancialProfileRepository? _financialProfile;
@@ -20,8 +20,14 @@ public class UnitOfWorkApp : UnitOfWork<SqlConnection>, IUnitOfWorkApp
 
     public UnitOfWorkApp(IConfiguration configuration)
     {
-        ConnectionString = configuration.GetConnectionString("DefaultConnection")
+        var rawConnStr = Environment.GetEnvironmentVariable("DATABASE_URL")
+            ?? configuration.GetConnectionString("DefaultConnection")
             ?? configuration.GetConnectionString("FinanceTrackerDb")
-            ?? configuration.GetConnectionString("AppDb");
+            ?? configuration.GetConnectionString("AppDb")
+            ?? string.Empty;
+
+        var (resolvedConn, isPg) = ConnectionStringParser.Resolve(rawConnStr);
+        ConnectionString = resolvedConn;
+        IsPostgres = isPg;
     }
 }

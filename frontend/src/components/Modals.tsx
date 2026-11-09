@@ -2241,3 +2241,126 @@ export function ReceivePixModal({
     </div>
   );
 }
+
+// 12. PIN PROTECTION MODAL
+interface PinModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
+  const [pin, setPin] = useState('');
+  const [currentSavedPin, setCurrentSavedPin] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('finance_app_pin') || '';
+      setCurrentSavedPin(saved);
+      setPin(saved);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof window !== 'undefined') {
+      if (pin.trim()) {
+        localStorage.setItem('finance_app_pin', pin.trim());
+      } else {
+        localStorage.removeItem('finance_app_pin');
+      }
+    }
+    if (onSuccess) onSuccess();
+    onClose();
+  };
+
+  const handleRemove = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('finance_app_pin');
+      setCurrentSavedPin('');
+      setPin('');
+    }
+    if (onSuccess) onSuccess();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-sm rounded-3xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl relative overflow-hidden"
+      >
+        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              🔒
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-zinc-100">PIN de Segurança</h2>
+              <p className="text-xs text-zinc-400">Proteja alterações na nuvem</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-zinc-800/50 hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="mt-5 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+              Digite o PIN de 4 a 6 dígitos:
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              autoFocus
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              placeholder="Ex: 1234"
+              className="w-full text-center tracking-widest text-lg font-mono px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-blue-500"
+            />
+            <p className="text-[11px] text-zinc-500 mt-1">
+              Configurado via variável de ambiente <code className="text-zinc-400">APP_PIN</code> no servidor Render.
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-between gap-2">
+            {currentSavedPin ? (
+              <button
+                type="button"
+                onClick={handleRemove}
+                className="px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/20"
+              >
+                Remover PIN
+              </button>
+            ) : <span />}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer"
+              >
+                Salvar PIN
+              </button>
+            </div>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+}

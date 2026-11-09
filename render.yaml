@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: financetracker-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    autoDeploy: true
+    healthCheckPath: /api/ping
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: Groq__ApiKey
+        sync: false
+      - key: Telegram__BotToken
+        sync: false
+      - key: Telegram__AllowedChatId
+        sync: false
+      - key: APP_PIN
+        sync: false

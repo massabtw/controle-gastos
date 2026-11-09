@@ -151,21 +151,60 @@ export interface FixedCommitment {
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(errorText || `API error: ${res.status}`);
+  
+  // Attach PIN if stored in localStorage
+  const pinHeader: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    const savedPin = localStorage.getItem('finance_app_pin');
+    if (savedPin) {
+      pinHeader['X-App-Pin'] = savedPin;
+    }
   }
 
-  return res.json();
+  // Detect slow first requests (Render cloud server spin-up detection)
+  let timer: NodeJS.Timeout | null = null;
+  if (typeof window !== 'undefined') {
+    timer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('render_server_waking_up', { detail: true }));
+    }, 3200);
+  }
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...pinHeader,
+        ...options?.headers,
+      },
+      cache: 'no-store',
+    });
+
+    if (timer) clearTimeout(timer);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('render_server_waking_up', { detail: false }));
+    }
+
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('finance_app_pin_required'));
+      }
+      throw new Error('Acesso negado: PIN inválido ou não configurado.');
+    }
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(errorText || `API error: ${res.status}`);
+    }
+
+    return res.json();
+  } catch (error) {
+    if (timer) clearTimeout(timer);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('render_server_waking_up', { detail: false }));
+    }
+    throw error;
+  }
 }
 
 export const api = {

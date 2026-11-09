@@ -4,6 +4,7 @@ namespace FinanceTracker.Domain.UnitOfWorks;
 
 public interface IUnitOfWorkApp : IUnitOfWork
 {
+    bool IsPostgres { get; }
     ICardExpenseRepository CardExpense { get; }
     IFinancialProfileRepository FinancialProfile { get; }
     IFixedCommitmentRepository FixedCommitment { get; }

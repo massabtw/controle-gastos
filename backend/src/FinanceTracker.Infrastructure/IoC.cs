@@ -28,7 +28,8 @@ public static class IoC
         services.AddHttpClient<ITelegramService, TelegramService>();
 
         // 4. Migrations
-        var connStr = configuration.GetConnectionString("DefaultConnection")
+        var connStr = Environment.GetEnvironmentVariable("DATABASE_URL")
+            ?? configuration.GetConnectionString("DefaultConnection")
             ?? configuration.GetConnectionString("FinanceTrackerDb")
             ?? configuration.GetConnectionString("AppDb")
             ?? string.Empty;
