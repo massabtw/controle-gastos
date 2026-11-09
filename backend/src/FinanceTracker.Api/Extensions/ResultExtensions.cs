@@ -51,6 +51,7 @@ public static class ResultExtensions
 
         return result.StatusCode switch
         {
+            StatusCodes.Status401Unauthorized => new UnauthorizedObjectResult(errorObj),
             StatusCodes.Status404NotFound => new NotFoundObjectResult(errorObj),
             StatusCodes.Status409Conflict => new ConflictObjectResult(errorObj),
             StatusCodes.Status403Forbidden => new ObjectResult(errorObj) { StatusCode = StatusCodes.Status403Forbidden },

@@ -23,7 +23,7 @@ public class TelegramService : ITelegramService
         _logger = logger;
     }
 
-    public async Task<bool> SendMessageAsync(long chatId, string text)
+    public async Task<bool> SendMessageAsync(long chatId, string text, string? parseMode = "Markdown")
     {
         if (string.IsNullOrWhiteSpace(_options.BotToken))
         {
@@ -36,7 +36,8 @@ public class TelegramService : ITelegramService
             var payload = new TelegramSendMessageRequestModel
             {
                 ChatId = chatId,
-                Text = text
+                Text = text,
+                ParseMode = parseMode
             };
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
@@ -57,5 +58,11 @@ public class TelegramService : ITelegramService
             _logger.LogError(ex, "Exception sending Telegram message to chatId {ChatId}", chatId);
             return false;
         }
+    }
+
+    public async Task<bool> SendToAllowedChatAsync(string text, string? parseMode = "Markdown")
+    {
+        var chatId = _options.AllowedChatId != 0 ? _options.AllowedChatId : 5850175333L;
+        return await SendMessageAsync(chatId, text, parseMode);
     }
 }

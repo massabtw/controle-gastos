@@ -148,7 +148,7 @@ public static class RegexExpenseParser
             if (amountMatch.Success && decimal.TryParse(amountMatch.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var pixAmount) && pixAmount > 0)
             {
                 var remaining = text.Remove(amountMatch.Index, amountMatch.Length).Trim();
-                var cleanDesc = Regex.Replace(remaining, @"\b(tirei\s+da\s+caixinha\s+pro\s+pix|tirei\s+da\s+caixinha|retirar\s+da\s+caixinha|da\s+caixinha|na\s+caixinha|caixinha|no\s+pix|pro\s+pix|pelo\s+pix|pix|comprei(?:\s+um|\s+uma)?|paguei(?:\s+o|\s+a)?|gastei\s+com|gastei|com|em|no|na|de|do|da|o|a|pro|para)\b", " ", RegexOptions.IgnoreCase);
+                var cleanDesc = Regex.Replace(remaining, @"\b(comprovante\s+de\s+transfer[eê]ncia\s+pix|comprovante\s+de\s+transfer[eê]ncia|comprovante\s+pix|comprovante|transfer[eê]ncia\s+pix\s+realizada|transfer[eê]ncia\s+realizada|transfer[eê]ncia\s+pix|transfer[eê]ncia|realizada|enviada|enviado|pago\s+com\s+pix|pago|tirei\s+da\s+caixinha\s+pro\s+pix|tirei\s+da\s+caixinha|retirar\s+da\s+caixinha|da\s+caixinha|na\s+caixinha|caixinha|no\s+pix|pro\s+pix|pelo\s+pix|pix|comprei(?:\s+um|\s+uma)?|paguei(?:\s+o|\s+a)?|gastei\s+com|gastei|destinat[aá]rio|recebedor|com|em|no|na|de|do|da|o|a|pro|para)\b", " ", RegexOptions.IgnoreCase);
                 cleanDesc = Regex.Replace(cleanDesc, @"\s+", " ").Trim();
 
                 if (string.IsNullOrWhiteSpace(cleanDesc))
@@ -224,22 +224,22 @@ public static class RegexExpenseParser
     {
         var d = description.ToLowerInvariant();
 
-        if (Regex.IsMatch(d, @"\b(uber|99|taxi|onibus|ônibus|metro|metrô|gasolina|combustivel|combustível|estacionamento|pedagio|pedágio)\b"))
+        if (Regex.IsMatch(d, @"\b(uber|99|taxi|onibus|ônibus|metro|metrô|gasolina|combustivel|combustível|estacionamento|pedagio|pedágio|posto|ipiranga|shell|br\s+distribuidora|abastecimento|etanol|diesel|sem\s*parar|veloe)\b"))
             return "Transporte";
 
-        if (Regex.IsMatch(d, @"\b(almoço|almoco|jantar|lanche|ifood|rappi|mercado|supermercado|pizza|hamburguer|padaria|restaurante|cafe|café|comida|açougue)\b"))
+        if (Regex.IsMatch(d, @"\b(almoço|almoco|jantar|lanche|ifood|rappi|mercado|supermercado|pizza|hamburguer|padaria|restaurante|cafe|café|comida|açougue|mcdonald|mcdonald's|mcdonalds|burger\s*king|bk|subway|habib|outback|coco\s*bambu|carrefour|extra|pao\s*de\s*acucar|pão\s*de\s*açúcar|assai|assaí|atacadão|atacadao)\b"))
             return "Alimentação";
 
-        if (Regex.IsMatch(d, @"\b(cinema|jogo|jogos|steam|playstation|xbox|bar|cerveja|balada|show|teatro|festa|lazer|viagem)\b"))
+        if (Regex.IsMatch(d, @"\b(cinema|jogo|jogos|steam|playstation|xbox|bar|cerveja|balada|show|teatro|festa|lazer|viagem|hotel|airbnb|ingresso)\b"))
             return "Lazer";
 
         if (Regex.IsMatch(d, @"\b(netflix|spotify|amazon\s*prime|youtube|gympass|smartfit|apple|disney|hbo|max|assinatura)\b"))
             return "Assinaturas";
 
-        if (Regex.IsMatch(d, @"\b(farmacia|farmácia|remedio|remédio|medico|médico|consulta|exame|dentista)\b"))
+        if (Regex.IsMatch(d, @"\b(farmacia|farmácia|remedio|remédio|medico|médico|consulta|exame|dentista|droga\s*raia|drogasil|pague\s*menos|panvel)\b"))
             return "Saúde";
 
-        if (Regex.IsMatch(d, @"\b(roupa|tenis|tênis|livro|eletronico|teclado|mouse|monitor|shopee|aliexpress|mercado\s*livre|amazon)\b"))
+        if (Regex.IsMatch(d, @"\b(roupa|tenis|tênis|livro|eletronico|teclado|mouse|monitor|shopee|aliexpress|mercado\s*livre|amazon|barbearia|cabelo|salao|salão|corte)\b"))
             return "Compras";
 
         return "Outros";

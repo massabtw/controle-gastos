@@ -34,7 +34,9 @@ public class PinProtectionMiddleware
 
         // Allow public webhooks and ping
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
-        if (path.StartsWith("/api/telegram/webhook") || path.StartsWith("/api/ping"))
+        if (path.StartsWith("/api/telegram/webhook") ||
+            path.StartsWith("/api/ping") ||
+            path.StartsWith("/api/integrations/ios-shortcut"))
         {
             await _next(context);
             return;
