@@ -13,20 +13,30 @@ internal class GroqAuthHandler : DelegatingHandler
         _options = options.Value;
     }
 
+    private string GetApiKey() =>
+        !string.IsNullOrWhiteSpace(_options.ApiKey)
+            ? _options.ApiKey
+            : Environment.GetEnvironmentVariable("GROQ_API_KEY")
+              ?? Environment.GetEnvironmentVariable("GROQ__APIKEY")
+              ?? Environment.GetEnvironmentVariable("Groq__ApiKey")
+              ?? string.Empty;
+
     protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+        var apiKey = GetApiKey();
+        if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }
         return base.Send(request, cancellationToken);
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
+        var apiKey = GetApiKey();
+        if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }
         return await base.SendAsync(request, cancellationToken);
     }

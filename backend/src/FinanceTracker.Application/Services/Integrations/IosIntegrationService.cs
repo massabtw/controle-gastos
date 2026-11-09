@@ -6,9 +6,11 @@ using FinanceTracker.Application.Interfaces.Integrations;
 using FinanceTracker.Application.Models;
 using FinanceTracker.Application.Services.Ai;
 using FinanceTracker.Domain.Http.Groq;
+using FinanceTracker.Domain.Http.Groq.Models;
 using FinanceTracker.Domain.Http.Telegram;
 using FinanceTracker.Domain.Results;
 using FluentValidation;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceTracker.Application.Services.Integrations;
@@ -21,6 +23,7 @@ public class IosIntegrationService : IIosIntegrationService
     private readonly IFinancialEngineService _financialEngineService;
     private readonly IGroqService _groqService;
     private readonly ITelegramService _telegramService;
+    private readonly IConfiguration? _configuration;
     private readonly IValidator<IosShortcutWebhookModel> _validator;
     private readonly ILogger<IosIntegrationService> _logger;
 
@@ -29,6 +32,7 @@ public class IosIntegrationService : IIosIntegrationService
         IFinancialEngineService financialEngineService,
         IGroqService groqService,
         ITelegramService telegramService,
+        IConfiguration? configuration,
         IValidator<IosShortcutWebhookModel> validator,
         ILogger<IosIntegrationService> logger)
     {
@@ -36,8 +40,20 @@ public class IosIntegrationService : IIosIntegrationService
         _financialEngineService = financialEngineService;
         _groqService = groqService;
         _telegramService = telegramService;
+        _configuration = configuration;
         _validator = validator;
         _logger = logger;
+    }
+
+    public IosIntegrationService(
+        IExpenseService expenseService,
+        IFinancialEngineService financialEngineService,
+        IGroqService groqService,
+        ITelegramService telegramService,
+        IValidator<IosShortcutWebhookModel> validator,
+        ILogger<IosIntegrationService> logger)
+        : this(expenseService, financialEngineService, groqService, telegramService, null, validator, logger)
+    {
     }
 
     public async Task<Result<IosShortcutResponseModel>> ProcessShortcutWebhookAsync(IosShortcutWebhookModel model)
@@ -99,13 +115,27 @@ public class IosIntegrationService : IIosIntegrationService
                     ? model.RawText.Trim()
                     : (model.Merchant?.Trim() ?? string.Empty);
 
-                var parsed = await _groqService.ParseExpenseIntentAsync(rawText);
-                if (parsed == null || parsed.Intent == "UNKNOWN" || parsed.Confidence < 0.6m)
+                ParsedExpenseIntentModel? parsed = null;
+
+                // Priority 1: Check if rawText is a receipt (Nubank OCR screen dump)
+                if (RegexExpenseParser.IsReceiptText(rawText))
+                {
+                    parsed = RegexExpenseParser.ParseReceipt(rawText);
+                }
+
+                // Priority 2: Use Groq LLM if receipt parser did not extract an amount or if natural text
+                if (parsed == null || parsed.Amount <= 0)
+                {
+                    parsed = await _groqService.ParseExpenseIntentAsync(rawText);
+                }
+
+                // Priority 3: Fallback to general regex parser
+                if (parsed == null || parsed.Intent == "UNKNOWN" || parsed.Confidence < 0.6m || parsed.Amount <= 0)
                 {
                     parsed = RegexExpenseParser.Parse(rawText);
                 }
 
-                description = !string.IsNullOrWhiteSpace(parsed?.Description) && parsed.Description != "Despesa"
+                description = !string.IsNullOrWhiteSpace(parsed?.Description) && parsed.Description != "Despesa" && parsed.Description != "Despesa OCR"
                     ? parsed.Description
                     : (!string.IsNullOrWhiteSpace(model.Merchant) ? model.Merchant.Trim() : "Despesa iOS");
 
@@ -139,6 +169,8 @@ public class IosIntegrationService : IIosIntegrationService
             category = SanitizeCategory(category);
 
             // 4. Persist in Neon PostgreSQL & Recalculate Cycle Metrics
+            var isPixCaixinha = string.Equals(paymentMethod, "PIX_CAIXINHA", StringComparison.OrdinalIgnoreCase);
+
             var createExpenseModel = new CreateExpenseModel
             {
                 Description = description,
@@ -147,7 +179,7 @@ public class IosIntegrationService : IIosIntegrationService
                 Category = category,
                 Installments = installments,
                 PaymentMethod = paymentMethod,
-                DeductFromCycleCap = true,
+                DeductFromCycleCap = !isPixCaixinha,
                 TransactionDate = transactionDate ?? DateTime.Now
             };
 
@@ -187,7 +219,22 @@ public class IosIntegrationService : IIosIntegrationService
 
             try
             {
-                await _telegramService.SendToAllowedChatAsync(telegramMsg, "Markdown");
+                var chatIdStr = _configuration?["Telegram:AllowedChatId"]
+                    ?? Environment.GetEnvironmentVariable("TELEGRAM__ALLOWEDCHATID")
+                    ?? Environment.GetEnvironmentVariable("Telegram__AllowedChatId")
+                    ?? Environment.GetEnvironmentVariable("TELEGRAM_ALLOWED_CHAT_ID");
+
+                var chatId = long.TryParse(chatIdStr, out var parsedChatId) && parsedChatId != 0
+                    ? parsedChatId
+                    : 5850175333L;
+
+                _logger.LogInformation("Sending proactive Telegram push notification for iOS shortcut to chatId {ChatId}...", chatId);
+                var sent = await _telegramService.SendMessageAsync(chatId, telegramMsg, "Markdown");
+                if (!sent)
+                {
+                    _logger.LogWarning("TelegramService.SendMessageAsync failed with Markdown, attempting plain text fallback for chatId {ChatId}...", chatId);
+                    await _telegramService.SendMessageAsync(chatId, telegramMsg, null);
+                }
             }
             catch (Exception ex)
             {

@@ -25,7 +25,15 @@ public class TelegramService : ITelegramService
 
     public async Task<bool> SendMessageAsync(long chatId, string text, string? parseMode = "Markdown")
     {
-        if (string.IsNullOrWhiteSpace(_options.BotToken))
+        var token = !string.IsNullOrWhiteSpace(_options.BotToken)
+            ? _options.BotToken
+            : Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN")
+              ?? Environment.GetEnvironmentVariable("TELEGRAM_TOKEN")
+              ?? Environment.GetEnvironmentVariable("TELEGRAM__BOTTOKEN")
+              ?? Environment.GetEnvironmentVariable("Telegram__BotToken")
+              ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(token))
         {
             _logger.LogWarning("Telegram bot token is not configured.");
             return false;
@@ -41,13 +49,27 @@ public class TelegramService : ITelegramService
             };
 
             var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            var url = $"{_options.BaseUrl.TrimEnd('/')}/bot{_options.BotToken}/sendMessage";
+            var url = $"{_options.BaseUrl.TrimEnd('/')}/bot{token}/sendMessage";
             var response = await _httpClient.PostAsync(url, content);
 
             if (!response.IsSuccessStatusCode)
             {
                 var err = await response.Content.ReadAsStringAsync();
                 _logger.LogError("Failed to send message to Telegram API: {Error}", err);
+
+                // If markdown formatting failed, fallback to plain text to rescue delivery
+                if (!string.IsNullOrWhiteSpace(parseMode))
+                {
+                    payload.ParseMode = null;
+                    var fallbackContent = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                    var fallbackResponse = await _httpClient.PostAsync(url, fallbackContent);
+                    if (fallbackResponse.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Telegram message delivered successfully via plain text fallback.");
+                        return true;
+                    }
+                }
+
                 return false;
             }
 
@@ -62,12 +84,16 @@ public class TelegramService : ITelegramService
 
     public async Task<bool> SendToAllowedChatAsync(string text, string? parseMode = "Markdown")
     {
-        if (_options.AllowedChatId == 0)
-        {
-            _logger.LogWarning("Telegram AllowedChatId is not configured.");
-            return false;
-        }
+        var chatId = _options.AllowedChatId != 0
+            ? _options.AllowedChatId
+            : (long.TryParse(
+                Environment.GetEnvironmentVariable("TELEGRAM__ALLOWEDCHATID")
+                ?? Environment.GetEnvironmentVariable("Telegram__AllowedChatId")
+                ?? Environment.GetEnvironmentVariable("TELEGRAM_ALLOWED_CHAT_ID"),
+                out var envChatId) && envChatId != 0
+                ? envChatId
+                : 5850175333L);
 
-        return await SendMessageAsync(_options.AllowedChatId, text, parseMode);
+        return await SendMessageAsync(chatId, text, parseMode);
     }
 }

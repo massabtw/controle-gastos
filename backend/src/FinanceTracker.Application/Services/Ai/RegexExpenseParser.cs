@@ -6,11 +6,160 @@ namespace FinanceTracker.Application.Services.Ai;
 
 public static class RegexExpenseParser
 {
+    public static bool IsReceiptText(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+
+        return Regex.IsMatch(input, @"\b(comprovante|transfer[eê]ncia|destino\s+nome|tipo\s+de\s+transfer[eê]ncia)\b", RegexOptions.IgnoreCase)
+            || (Regex.IsMatch(input, @"r\$\s*\d", RegexOptions.IgnoreCase) && Regex.IsMatch(input, @"\b(nome|destino|favorecido|recebedor|pix)\b", RegexOptions.IgnoreCase));
+    }
+
+    public static ParsedExpenseIntentModel? ParseReceipt(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return null;
+
+        // 1. Amount Extraction
+        // Prioritize explicit currency markers: "Valor R$ XX,XX" or "Valor da transferência R$ XX,XX"
+        var amountMatch = Regex.Match(input, @"(?:valor(?:\s+da\s+transfer[eê]ncia)?\s*:?\s*)r\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})", RegexOptions.IgnoreCase);
+        if (!amountMatch.Success)
+        {
+            // Any "R$ XX,XX"
+            amountMatch = Regex.Match(input, @"r\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})", RegexOptions.IgnoreCase);
+        }
+        if (!amountMatch.Success)
+        {
+            // "Valor: XX,XX"
+            amountMatch = Regex.Match(input, @"valor\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})", RegexOptions.IgnoreCase);
+        }
+
+        if (!amountMatch.Success)
+        {
+            return null;
+        }
+
+        var rawAmount = amountMatch.Groups[1].Value.Trim();
+        if (rawAmount.Contains('.') && rawAmount.Contains(','))
+        {
+            rawAmount = rawAmount.Replace(".", "").Replace(',', '.');
+        }
+        else if (rawAmount.Contains(','))
+        {
+            rawAmount = rawAmount.Replace(',', '.');
+        }
+
+        if (!decimal.TryParse(rawAmount, NumberStyles.Any, CultureInfo.InvariantCulture, out var amount) || amount <= 0)
+        {
+            return null;
+        }
+
+        // 2. Recipient / Description Extraction
+        string description = "Despesa OCR";
+
+        var recipientMatch = Regex.Match(
+            input,
+            @"\b(?:Destino\s+Nome|Nome\s+do\s+destinat[aá]rio|Nome\s+do\s+recebedor|Nome\s+do\s+favorecido|Destinat[aá]rio|Favorecido|Recebedor)\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\-&]{2,80})",
+            RegexOptions.IgnoreCase
+        );
+
+        if (!recipientMatch.Success)
+        {
+            recipientMatch = Regex.Match(
+                input,
+                @"\bNome\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\-&]{2,80})",
+                RegexOptions.IgnoreCase
+            );
+        }
+
+        if (!recipientMatch.Success)
+        {
+            recipientMatch = Regex.Match(
+                input,
+                @"\b(?:Destino|Para)\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\-&]{2,80})",
+                RegexOptions.IgnoreCase
+            );
+        }
+
+        if (recipientMatch.Success)
+        {
+            var rawName = recipientMatch.Groups[1].Value.Trim();
+
+            var cutoff = Regex.Match(
+                rawName,
+                @"^(.*?)(?:\s+(?:CPF|CNPJ|Chave(?:\s+pix)?|Institui[çc][ãa]o|Banco|Conta(?:\s+corrente)?|Ag[êe]ncia|Tipo|\d{3}\.\d{3}|\r|\n|$))",
+                RegexOptions.IgnoreCase
+            );
+
+            if (cutoff.Success && !string.IsNullOrWhiteSpace(cutoff.Groups[1].Value))
+            {
+                rawName = cutoff.Groups[1].Value.Trim();
+            }
+
+            rawName = Regex.Replace(rawName, @"^(?:Destino\s+Nome|Nome|Para)\s*:?\s*", "", RegexOptions.IgnoreCase).Trim();
+            rawName = rawName.TrimEnd('.', ',', '-', ' ', ':');
+
+            if (!string.IsNullOrWhiteSpace(rawName) && rawName.Length >= 2)
+            {
+                description = rawName;
+            }
+        }
+
+        // 3. Date extraction if present (e.g. "09 NOV 2026")
+        DateTime? transactionDate = null;
+        var dateMatch = Regex.Match(input, @"(\d{1,2})\s+(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\w*\s+(\d{4})", RegexOptions.IgnoreCase);
+        if (dateMatch.Success)
+        {
+            var day = int.Parse(dateMatch.Groups[1].Value);
+            var monthStr = dateMatch.Groups[2].Value.ToUpperInvariant();
+            var year = int.Parse(dateMatch.Groups[3].Value);
+            var month = monthStr switch
+            {
+                "JAN" => 1, "FEV" => 2, "MAR" => 3, "ABR" => 4,
+                "MAI" => 5, "JUN" => 6, "JUL" => 7, "AGO" => 8,
+                "SET" => 9, "OUT" => 10, "NOV" => 11, "DEZ" => 12,
+                _ => DateTime.Now.Month
+            };
+            try
+            {
+                transactionDate = new DateTime(year, month, day);
+            }
+            catch { }
+        }
+
+        // 4. Payment method inference from receipt
+        var isPix = Regex.IsMatch(input, @"\b(pix|caixinha|transfer[eê]ncia)\b", RegexOptions.IgnoreCase);
+        var paymentMethod = isPix ? "PIX_CAIXINHA" : "CARD";
+
+        // 5. Category inference
+        var category = InferCategory(description);
+
+        return new ParsedExpenseIntentModel
+        {
+            Intent = "ADD_EXPENSE",
+            Description = description,
+            Amount = amount,
+            Installments = 1,
+            Category = category,
+            PaymentMethod = paymentMethod,
+            TransactionDate = transactionDate,
+            Confidence = 0.95m
+        };
+    }
+
     public static ParsedExpenseIntentModel Parse(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
         {
             return new ParsedExpenseIntentModel { Intent = "UNKNOWN" };
+        }
+
+        // Check if input is a structured receipt / transfer dump first
+        if (IsReceiptText(input))
+        {
+            var receipt = ParseReceipt(input);
+            if (receipt != null && receipt.Amount > 0)
+            {
+                return receipt;
+            }
         }
 
         var text = input.Trim().ToLowerInvariant();
@@ -144,7 +293,10 @@ public static class RegexExpenseParser
         var isPix = Regex.IsMatch(text, @"\b(pix|caixinha)\b", RegexOptions.IgnoreCase);
         if (isPix)
         {
-            var amountMatch = Regex.Match(text, @"(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)", RegexOptions.IgnoreCase);
+            var amountMatch = text.Contains("r$")
+                ? Regex.Match(text, @"r\$\s*([0-9]+(?:[\.,][0-9]{1,2})?)", RegexOptions.IgnoreCase)
+                : Regex.Match(text, @"(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)", RegexOptions.IgnoreCase);
+
             if (amountMatch.Success && decimal.TryParse(amountMatch.Groups[1].Value.Replace(',', '.'), NumberStyles.Any, CultureInfo.InvariantCulture, out var pixAmount) && pixAmount > 0)
             {
                 var remaining = text.Remove(amountMatch.Index, amountMatch.Length).Trim();

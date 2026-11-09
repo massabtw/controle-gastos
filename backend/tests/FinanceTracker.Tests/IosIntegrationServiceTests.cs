@@ -1,6 +1,7 @@
 using FinanceTracker.Application.Interfaces.Expenses;
 using FinanceTracker.Application.Interfaces.FinancialEngine;
 using FinanceTracker.Application.Models;
+using FinanceTracker.Application.Services.Ai;
 using FinanceTracker.Application.Services.Integrations;
 using FinanceTracker.Application.Validations;
 using FinanceTracker.Domain.Http.Groq;
@@ -266,6 +267,55 @@ public class IosIntegrationServiceTests
     }
 
     [Fact]
+    public async Task ProcessShortcutWebhookAsync_RawOcrNubankPixDetailedScreenDump_ShouldParseAmountAndRecipientAndNotDeductFromCap()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService(); // returns null, forcing regex OCR fallback
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            RawText = "Comprovante de transferência 09 NOV 2026 - 16:14:50 Valor R$ 0,01 Tipo de transferência Pix Destino Nome Gustavo Antonio A Rodrigues CPF ***.123.456-**",
+            PaymentMethod = "PIX_CAIXINHA"
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.True(result.IsSuccess, result.Error ?? "Error was null");
+        Assert.NotNull(result.Value);
+        Assert.NotNull(expenseService.LastCreatedModel);
+
+        // 1. Amount should be 0.01 (NOT 9 from date 09 NOV 2026)
+        Assert.Equal(0.01m, expenseService.LastCreatedModel.Amount);
+
+        // 2. Description should be Gustavo Antonio A Rodrigues
+        Assert.Equal("Gustavo Antonio A Rodrigues", expenseService.LastCreatedModel.Description);
+
+        // 3. PIX_CAIXINHA should not deduct from cycle cap
+        Assert.Equal("PIX_CAIXINHA", expenseService.LastCreatedModel.PaymentMethod);
+        Assert.False(expenseService.LastCreatedModel.DeductFromCycleCap);
+
+        // 4. Proactive Telegram push must be delivered
+        Assert.NotNull(telegram.LastMessage);
+        Assert.Contains("🍏 *iPhone Auto-Sync (Pix Caixinha)*", telegram.LastMessage);
+        Assert.Contains("Gustavo Antonio A Rodrigues", telegram.LastMessage);
+        Assert.Contains("R$ 0,01", telegram.LastMessage);
+        Assert.Equal(5850175333L, telegram.LastChatId);
+    }
+
+    [Fact]
     public async Task ProcessShortcutWebhookAsync_EmptyPayload_ShouldReturn400()
     {
         Environment.SetEnvironmentVariable("APP_PIN", null);
@@ -295,5 +345,19 @@ public class IosIntegrationServiceTests
         Assert.False(result.IsSuccess);
         Assert.Equal(400, result.StatusCode);
         Assert.Contains("Merchant", result.Error);
+    }
+
+    [Theory]
+    [InlineData("Comprovante de transferência 09 NOV 2026 - 16:14:50 Valor R$ 0,01 Tipo de transferência Pix Destino Nome Gustavo Antonio A Rodrigues", 0.01, "Gustavo Antonio A Rodrigues")]
+    [InlineData("Comprovante de transferência Pix R$ 35,00 para Barbearia Silva", 35.00, "Barbearia Silva")]
+    [InlineData("Comprovante Pix\nValor: R$ 1.250,50\nDestino Nome: Loja de Moveis LTDA CNPJ: 12.345.678/0001-90", 1250.50, "Loja de Moveis LTDA")]
+    public void RegexExpenseParser_Parse_NubankReceipts_ShouldExtractCorrectAmountAndRecipient(string receiptText, decimal expectedAmount, string expectedRecipient)
+    {
+        var result = RegexExpenseParser.Parse(receiptText);
+
+        Assert.Equal("ADD_EXPENSE", result.Intent);
+        Assert.Equal(expectedAmount, result.Amount);
+        Assert.Equal(expectedRecipient, result.Description);
+        Assert.Equal("PIX_CAIXINHA", result.PaymentMethod);
     }
 }

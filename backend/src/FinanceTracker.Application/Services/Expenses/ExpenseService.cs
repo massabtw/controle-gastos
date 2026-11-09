@@ -87,7 +87,7 @@ public class ExpenseService : IExpenseService
 
                 var entity = model.ToEntity(targetCycle, 1, 1);
                 entity.PaymentMethod = "PIX_CAIXINHA";
-                entity.DeductFromCycleCap = model.DeductFromCycleCap ?? true;
+                entity.DeductFromCycleCap = false;
 
                 var id = await _unitOfWork.CardExpense.CreateAsync(entity);
                 entity.Id = id;
