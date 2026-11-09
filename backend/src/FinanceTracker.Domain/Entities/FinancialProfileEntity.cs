@@ -19,5 +19,8 @@ public class FinancialProfileEntity : Entity
     public string? TelegramBotToken { get; set; }
     public long? TelegramAllowedChatId { get; set; }
 
+    public bool IsInvoicePaid { get; set; }
+    public string? LastPaidCycle { get; set; }
+
     public decimal TotalIncome => IncomeFirstTranche + IncomeSecondTranche;
 }

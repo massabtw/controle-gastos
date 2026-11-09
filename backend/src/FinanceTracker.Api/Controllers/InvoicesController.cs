@@ -19,6 +19,9 @@ public class InvoicesController : ControllerBase
     }
 
     [HttpPost("{cycle}/toggle-paid")]
+    [HttpPost("{cycle}/unpay")]
+    [HttpPost("{cycle}/revert-invoice")]
+    [HttpPost("{cycle}/revert")]
     public async Task<IActionResult> TogglePaidByRoute(
         [FromServices] IInvoiceService service,
         string cycle)
@@ -28,6 +31,8 @@ public class InvoicesController : ControllerBase
     }
 
     [HttpPost("toggle-paid")]
+    [HttpPost("unpay")]
+    [HttpPost("revert-invoice")]
     public async Task<IActionResult> TogglePaid(
         [FromServices] IInvoiceService service,
         [FromBody] MarkInvoicePaidModel model)

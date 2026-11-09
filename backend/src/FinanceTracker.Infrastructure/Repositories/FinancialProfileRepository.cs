@@ -32,6 +32,8 @@ public class FinancialProfileRepository : IFinancialProfileRepository
                     GroqApiKey,
                     TelegramBotToken,
                     TelegramAllowedChatId,
+                    IsInvoicePaid,
+                    LastPaidCycle,
                     CreatedAt, UpdatedAt, Deleted
                 FROM FinancialProfile
                 WHERE Deleted = FALSE
@@ -52,6 +54,8 @@ public class FinancialProfileRepository : IFinancialProfileRepository
                     GroqApiKey,
                     TelegramBotToken,
                     TelegramAllowedChatId,
+                    IsInvoicePaid,
+                    LastPaidCycle,
                     CreatedAt, UpdatedAt, Deleted
                 FROM dbo.FinancialProfile
                 WHERE Deleted = 0
@@ -84,6 +88,8 @@ public class FinancialProfileRepository : IFinancialProfileRepository
                     GroqApiKey = @GroqApiKey,
                     TelegramBotToken = @TelegramBotToken,
                     TelegramAllowedChatId = @TelegramAllowedChatId,
+                    IsInvoicePaid = @IsInvoicePaid,
+                    LastPaidCycle = @LastPaidCycle,
                     UpdatedAt = CURRENT_TIMESTAMP
                 WHERE Id = @Id AND Deleted = FALSE;"
             : @"UPDATE dbo.FinancialProfile
@@ -100,6 +106,8 @@ public class FinancialProfileRepository : IFinancialProfileRepository
                     GroqApiKey = @GroqApiKey,
                     TelegramBotToken = @TelegramBotToken,
                     TelegramAllowedChatId = @TelegramAllowedChatId,
+                    IsInvoicePaid = @IsInvoicePaid,
+                    LastPaidCycle = @LastPaidCycle,
                     UpdatedAt = SYSDATETIMEOFFSET()
                 WHERE Id = @Id AND Deleted = 0;";
 

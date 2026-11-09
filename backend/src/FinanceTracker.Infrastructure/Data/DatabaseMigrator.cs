@@ -124,6 +124,22 @@ public class DatabaseMigrator
 
         await conn.ExecuteAsync(ddl);
 
+        // Idempotent column migrations for existing PostgreSQL databases (Neon)
+        const string pgColumnMigrations = @"
+            ALTER TABLE FinancialProfile ADD COLUMN IF NOT EXISTS IsInvoicePaid BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE FinancialProfile ADD COLUMN IF NOT EXISTS LastPaidCycle VARCHAR(7) NULL;
+
+            ALTER TABLE FixedCommitments ADD COLUMN IF NOT EXISTS LastPaidCycle VARCHAR(7) NULL;
+            ALTER TABLE FixedCommitments ADD COLUMN IF NOT EXISTS BillingDay INT NULL DEFAULT 1;
+            ALTER TABLE FixedCommitments ADD COLUMN IF NOT EXISTS PaymentSource VARCHAR(20) NOT NULL DEFAULT 'PIX_CAIXINHA';
+            ALTER TABLE FixedCommitments ADD COLUMN IF NOT EXISTS CommitmentType VARCHAR(20) NOT NULL DEFAULT 'PIX_COMMITMENT';
+
+            ALTER TABLE InvoicePayments ADD COLUMN IF NOT EXISTS SurplusAmount NUMERIC(12,2) NOT NULL DEFAULT 0.00;
+            ALTER TABLE InvoicePayments ADD COLUMN IF NOT EXISTS SurplusInvested BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE InvoicePayments ADD COLUMN IF NOT EXISTS Notes TEXT NULL;
+        ";
+        await conn.ExecuteAsync(pgColumnMigrations);
+
         // Seed initial profile if empty
         var profileCount = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM FinancialProfile;");
         if (profileCount == 0)
@@ -163,6 +179,8 @@ public class DatabaseMigrator
         {
             // FinancialProfile
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'Uuid') ALTER TABLE dbo.FinancialProfile ADD Uuid UNIQUEIDENTIFIER NOT NULL DEFAULT (NEWID());",
+            "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'IsInvoicePaid') ALTER TABLE dbo.FinancialProfile ADD IsInvoicePaid BIT NOT NULL DEFAULT 0;",
+            "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'LastPaidCycle') ALTER TABLE dbo.FinancialProfile ADD LastPaidCycle VARCHAR(7) NULL;",
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'CreatedAt') ALTER TABLE dbo.FinancialProfile ADD CreatedAt DATETIMEOFFSET(7) NULL DEFAULT (SYSDATETIMEOFFSET());",
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'UpdatedAt') ALTER TABLE dbo.FinancialProfile ADD UpdatedAt DATETIMEOFFSET(7) NULL DEFAULT (SYSDATETIMEOFFSET());",
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.FinancialProfile') AND name = 'Deleted') ALTER TABLE dbo.FinancialProfile ADD Deleted BIT NULL DEFAULT 0;",
