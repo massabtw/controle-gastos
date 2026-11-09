@@ -14,11 +14,6 @@ public class IntegrationsController : ControllerBase
         [FromServices] IIosIntegrationService integrationService,
         [FromBody] IosShortcutWebhookModel model)
     {
-        if (string.IsNullOrWhiteSpace(model.SecretPin) && Request.Headers.TryGetValue("X-App-Pin", out var pinHeader))
-        {
-            model.SecretPin = pinHeader.ToString();
-        }
-
         var result = await integrationService.ProcessShortcutWebhookAsync(model);
         return result.Ok();
     }

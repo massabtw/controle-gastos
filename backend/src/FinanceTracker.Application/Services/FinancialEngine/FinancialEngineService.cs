@@ -95,8 +95,9 @@ public class FinancialEngineService : IFinancialEngineService
             var manualCardExpensesTotal = cycleExpensesEntities.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
             var currentInvoiceTotal = manualCardExpensesTotal + cardSubscriptionsTotal;
             var pixCaixinhaUsedInCycle = cycleExpensesEntities.Where(e => e.PaymentMethod == "PIX_CAIXINHA" && e.DeductFromCycleCap).Sum(e => e.Amount);
-            var totalSpentInCycle = currentInvoiceTotal + pixCaixinhaUsedInCycle;
-            var remainingBudget = cardHardCap - currentInvoiceTotal - pixCaixinhaUsedInCycle;
+            var otherDeductibleExpenses = cycleExpensesEntities.Where(e => e.PaymentMethod != "CARD" && e.PaymentMethod != "PIX_CAIXINHA" && e.PaymentMethod != "PIX_INFLOW" && e.DeductFromCycleCap).Sum(e => e.Amount);
+            var totalSpentInCycle = currentInvoiceTotal + pixCaixinhaUsedInCycle + otherDeductibleExpenses;
+            var remainingBudget = cardHardCap - totalSpentInCycle;
 
             var daysUntilClosing = BillingCycleCalculator.GetDaysUntilClosing(now, profile.ClosingDay, inspectedCycle);
             var availablePerDay = (daysUntilClosing > 0 && remainingBudget > 0)

@@ -1,3 +1,4 @@
+using System.Globalization;
 using FinanceTracker.Application.Helpers;
 using FinanceTracker.Application.Interfaces.Expenses;
 using FinanceTracker.Application.Interfaces.FinancialEngine;
@@ -7,16 +8,20 @@ using FinanceTracker.Application.Services.Ai;
 using FinanceTracker.Domain.Http.Groq;
 using FinanceTracker.Domain.Http.Telegram;
 using FinanceTracker.Domain.Results;
+using FluentValidation;
 using Microsoft.Extensions.Logging;
 
 namespace FinanceTracker.Application.Services.Integrations;
 
 public class IosIntegrationService : IIosIntegrationService
 {
+    private static readonly CultureInfo PtBrCulture = new("pt-BR");
+
     private readonly IExpenseService _expenseService;
     private readonly IFinancialEngineService _financialEngineService;
     private readonly IGroqService _groqService;
     private readonly ITelegramService _telegramService;
+    private readonly IValidator<IosShortcutWebhookModel> _validator;
     private readonly ILogger<IosIntegrationService> _logger;
 
     public IosIntegrationService(
@@ -24,12 +29,14 @@ public class IosIntegrationService : IIosIntegrationService
         IFinancialEngineService financialEngineService,
         IGroqService groqService,
         ITelegramService telegramService,
+        IValidator<IosShortcutWebhookModel> validator,
         ILogger<IosIntegrationService> logger)
     {
         _expenseService = expenseService;
         _financialEngineService = financialEngineService;
         _groqService = groqService;
         _telegramService = telegramService;
+        _validator = validator;
         _logger = logger;
     }
 
@@ -47,7 +54,14 @@ public class IosIntegrationService : IIosIntegrationService
                 }
             }
 
-            // 2. Parse currency amount resiliently
+            // 2. Validate input model with FluentValidation
+            var validationResult = await _validator.ValidateAsync(model);
+            if (!validationResult.IsValid)
+            {
+                return Result<IosShortcutResponseModel>.Failure(validationResult.Errors[0].ErrorMessage, 400);
+            }
+
+            // 3. Parse currency amount resiliently
             var parsedAmount = CurrencyParser.Parse(model.Amount);
 
             string description;
@@ -55,8 +69,10 @@ public class IosIntegrationService : IIosIntegrationService
             string category;
             string paymentMethod;
             int installments;
+            DateTime? transactionDate = null;
 
-            var isStructuredApplePay = !string.IsNullOrWhiteSpace(model.Merchant) && parsedAmount.HasValue && parsedAmount.Value > 0;
+            var isRawTextPayload = !string.IsNullOrWhiteSpace(model.RawText);
+            var isStructuredApplePay = !isRawTextPayload && !string.IsNullOrWhiteSpace(model.Merchant) && parsedAmount.HasValue && parsedAmount.Value > 0;
 
             if (isStructuredApplePay)
             {
@@ -70,7 +86,7 @@ public class IosIntegrationService : IIosIntegrationService
                 if (category == "Outros")
                 {
                     var nlpParsed = await _groqService.ParseExpenseIntentAsync(description);
-                    if (nlpParsed != null && !string.IsNullOrWhiteSpace(nlpParsed.Category) && nlpParsed.Category != "Outros")
+                    if (nlpParsed != null && !string.IsNullOrWhiteSpace(nlpParsed.Category))
                     {
                         category = nlpParsed.Category;
                     }
@@ -78,15 +94,10 @@ public class IosIntegrationService : IIosIntegrationService
             }
             else
             {
-                // Case B — Raw OCR / Natural Text Payload
+                // Case B — Raw OCR / Natural Text Payload (RawText present, or Amount is null/0)
                 var rawText = !string.IsNullOrWhiteSpace(model.RawText)
                     ? model.RawText.Trim()
                     : (model.Merchant?.Trim() ?? string.Empty);
-
-                if (string.IsNullOrWhiteSpace(rawText))
-                {
-                    return Result<IosShortcutResponseModel>.Failure("Nenhum dado de transação, estabelecimento ou texto OCR foi fornecido.", 400);
-                }
 
                 var parsed = await _groqService.ParseExpenseIntentAsync(rawText);
                 if (parsed == null || parsed.Intent == "UNKNOWN" || parsed.Confidence < 0.6m)
@@ -99,7 +110,7 @@ public class IosIntegrationService : IIosIntegrationService
                     : (!string.IsNullOrWhiteSpace(model.Merchant) ? model.Merchant.Trim() : "Despesa iOS");
 
                 amount = (parsed?.Amount > 0) ? parsed.Amount : (parsedAmount ?? 0);
-                category = !string.IsNullOrWhiteSpace(parsed?.Category) && parsed.Category != "Outros"
+                category = !string.IsNullOrWhiteSpace(parsed?.Category)
                     ? parsed.Category
                     : RegexExpenseParser.InferCategory(description);
 
@@ -107,7 +118,10 @@ public class IosIntegrationService : IIosIntegrationService
                     ? parsed.PaymentMethod.ToUpperInvariant()
                     : "CARD";
 
-                installments = parsed?.Installments ?? (model.Installments is > 0 ? model.Installments.Value : 1);
+                // Explicit installments passed in request takes precedence over parsed
+                installments = model.Installments is > 0 ? model.Installments.Value : (parsed?.Installments > 0 ? parsed.Installments : 1);
+
+                transactionDate = parsed?.TransactionDate;
 
                 // Explicit PaymentMethod override if passed in request
                 if (!string.IsNullOrWhiteSpace(model.PaymentMethod))
@@ -121,7 +135,10 @@ public class IosIntegrationService : IIosIntegrationService
                 return Result<IosShortcutResponseModel>.Failure("Não foi possível identificar o valor monetário da transação.", 400);
             }
 
-            // 3. Persist in Neon PostgreSQL & Recalculate Cycle Metrics
+            // Ensure category adheres to the 6 allowed categories
+            category = SanitizeCategory(category);
+
+            // 4. Persist in Neon PostgreSQL & Recalculate Cycle Metrics
             var createExpenseModel = new CreateExpenseModel
             {
                 Description = description,
@@ -131,7 +148,7 @@ public class IosIntegrationService : IIosIntegrationService
                 Installments = installments,
                 PaymentMethod = paymentMethod,
                 DeductFromCycleCap = true,
-                TransactionDate = DateTime.Now
+                TransactionDate = transactionDate ?? DateTime.Now
             };
 
             var expenseResult = await _expenseService.CreateExpenseAsync(createExpenseModel);
@@ -152,7 +169,7 @@ public class IosIntegrationService : IIosIntegrationService
             var dailyBurnRate = summary?.AvailablePerDay ?? 0;
             var daysRemaining = summary?.DaysUntilClosing ?? 0;
 
-            // 4. Proactive Telegram Push Notification
+            // 5. Proactive Telegram Push Notification
             var paymentMethodLabel = paymentMethod switch
             {
                 "PIX_CAIXINHA" => "Pix Caixinha",
@@ -164,9 +181,9 @@ public class IosIntegrationService : IIosIntegrationService
             var telegramMsg =
                 $"🍏 *iPhone Auto-Sync ({paymentMethodLabel})*\n" +
                 $"✅ Lançado: *{description}* ({category})\n" +
-                $"💸 Valor: *R$ {amount:F2}*\n" +
-                $"📊 Fatura / Ciclo: *R$ {currentInvoiceTotal:F2}* / R$ {hardCap:F2}\n" +
-                $"🔥 Novo Teto Diário: *R$ {dailyBurnRate:F2}/dia* ({daysRemaining}d restantes)";
+                $"💸 Valor: *R$ {amount.ToString("F2", PtBrCulture)}*\n" +
+                $"📊 Fatura / Ciclo: *R$ {currentInvoiceTotal.ToString("F2", PtBrCulture)}* / R$ {hardCap.ToString("F2", PtBrCulture)}\n" +
+                $"🔥 Novo Teto Diário: *R$ {dailyBurnRate.ToString("F2", PtBrCulture)}/dia* ({daysRemaining}d restantes)";
 
             try
             {
@@ -177,8 +194,8 @@ public class IosIntegrationService : IIosIntegrationService
                 _logger.LogWarning(ex, "Failed to send Telegram notification");
             }
 
-            // 5. Endpoint Response for iOS Banner Feedback
-            var responseMessage = $"✅ R$ {amount:F2} em {description} registrado! Novo teto: R$ {dailyBurnRate:F2}/dia";
+            // 6. Endpoint Response for iOS Banner Feedback
+            var responseMessage = $"✅ R$ {amount.ToString("F2", PtBrCulture)} em {description} registrado! Novo teto: R$ {dailyBurnRate.ToString("F2", PtBrCulture)}/dia";
 
             var responseModel = new IosShortcutResponseModel
             {
@@ -196,5 +213,14 @@ public class IosIntegrationService : IIosIntegrationService
             _logger.LogError(ex, "Error handling iOS Shortcut webhook");
             return Result<IosShortcutResponseModel>.Failure("Erro interno ao processar o webhook do iOS.", 500);
         }
+    }
+
+    private static string SanitizeCategory(string? category)
+    {
+        return category switch
+        {
+            "Alimentação" or "Transporte" or "Lazer" or "Compras" or "Saúde" or "Outros" => category,
+            _ => "Outros"
+        };
     }
 }

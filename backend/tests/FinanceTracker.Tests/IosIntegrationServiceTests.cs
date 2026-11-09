@@ -2,6 +2,7 @@ using FinanceTracker.Application.Interfaces.Expenses;
 using FinanceTracker.Application.Interfaces.FinancialEngine;
 using FinanceTracker.Application.Models;
 using FinanceTracker.Application.Services.Integrations;
+using FinanceTracker.Application.Validations;
 using FinanceTracker.Domain.Http.Groq;
 using FinanceTracker.Domain.Http.Groq.Models;
 using FinanceTracker.Domain.Http.Telegram;
@@ -114,12 +115,14 @@ public class IosIntegrationServiceTests
         var financialEngine = new FakeFinancialEngineService();
         var groq = new FakeGroqService();
         var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
 
         var service = new IosIntegrationService(
             expenseService,
             financialEngine,
             groq,
             telegram,
+            validator,
             NullLogger<IosIntegrationService>.Instance
         );
 
@@ -137,6 +140,8 @@ public class IosIntegrationServiceTests
         Assert.Equal(31.20m, result.Value.DailyBurnRate);
         Assert.Equal(624.00m, result.Value.RemainingCap);
         Assert.Contains("Posto Ipiranga", result.Value.Message);
+        Assert.Contains("R$ 50,00", result.Value.Message);
+        Assert.Contains("R$ 31,20/dia", result.Value.Message);
 
         Assert.NotNull(expenseService.LastCreatedModel);
         Assert.Equal("Posto Ipiranga", expenseService.LastCreatedModel.Description);
@@ -147,6 +152,7 @@ public class IosIntegrationServiceTests
         Assert.NotNull(telegram.LastMessage);
         Assert.Contains("🍏 *iPhone Auto-Sync (Apple Pay)*", telegram.LastMessage);
         Assert.Contains("Posto Ipiranga", telegram.LastMessage);
+        Assert.Contains("R$ 50,00", telegram.LastMessage);
     }
 
     [Fact]
@@ -157,12 +163,14 @@ public class IosIntegrationServiceTests
         var financialEngine = new FakeFinancialEngineService();
         var groq = new FakeGroqService();
         var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
 
         var service = new IosIntegrationService(
             expenseService,
             financialEngine,
             groq,
             telegram,
+            validator,
             NullLogger<IosIntegrationService>.Instance
         );
 
@@ -183,6 +191,39 @@ public class IosIntegrationServiceTests
 
         Assert.NotNull(telegram.LastMessage);
         Assert.Contains("🍏 *iPhone Auto-Sync (Pix Caixinha)*", telegram.LastMessage);
+        Assert.Contains("R$ 35,00", telegram.LastMessage);
+    }
+
+    [Fact]
+    public async Task ProcessShortcutWebhookAsync_RawOcrWithExplicitInstallments_ShouldKeepExplicitInstallments()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService();
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            RawText = "Comprovante de transferência Pix R$ 35,00 para Barbearia Silva",
+            Installments = 3
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.True(result.IsSuccess, result.Error ?? "Error was null");
+        Assert.NotNull(expenseService.LastCreatedModel);
+        Assert.Equal(3, expenseService.LastCreatedModel.Installments);
     }
 
     [Fact]
@@ -192,12 +233,14 @@ public class IosIntegrationServiceTests
         var financialEngine = new FakeFinancialEngineService();
         var groq = new FakeGroqService();
         var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
 
         var service = new IosIntegrationService(
             expenseService,
             financialEngine,
             groq,
             telegram,
+            validator,
             NullLogger<IosIntegrationService>.Instance
         );
 
@@ -220,5 +263,37 @@ public class IosIntegrationServiceTests
         {
             Environment.SetEnvironmentVariable("APP_PIN", null);
         }
+    }
+
+    [Fact]
+    public async Task ProcessShortcutWebhookAsync_EmptyPayload_ShouldReturn400()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService();
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            Merchant = null,
+            RawText = null
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Contains("Merchant", result.Error);
     }
 }

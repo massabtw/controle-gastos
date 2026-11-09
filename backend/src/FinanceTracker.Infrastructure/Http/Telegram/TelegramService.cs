@@ -62,7 +62,12 @@ public class TelegramService : ITelegramService
 
     public async Task<bool> SendToAllowedChatAsync(string text, string? parseMode = "Markdown")
     {
-        var chatId = _options.AllowedChatId != 0 ? _options.AllowedChatId : 5850175333L;
-        return await SendMessageAsync(chatId, text, parseMode);
+        if (_options.AllowedChatId == 0)
+        {
+            _logger.LogWarning("Telegram AllowedChatId is not configured.");
+            return false;
+        }
+
+        return await SendMessageAsync(_options.AllowedChatId, text, parseMode);
     }
 }
