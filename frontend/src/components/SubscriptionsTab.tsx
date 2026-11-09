@@ -77,7 +77,10 @@ export function SubscriptionsTab({
     }
   };
 
-  const activeSubs = subscriptions.filter((s) => s.isActive);
+  const inspectedCycle = summary?.billingCycle || '';
+  const activeSubs = subscriptions.filter(
+    (s) => s.isActive && (!inspectedCycle || !s.startCycle || s.startCycle <= inspectedCycle)
+  );
   const cardSubsTotal = activeSubs
     .filter((s) => s.paymentSource === 'CARD')
     .reduce((acc, s) => acc + s.amount, 0);

@@ -1,5 +1,6 @@
-using FinanceTracker.Api.Domain.Dtos;
-using FinanceTracker.Api.Services;
+using FinanceTracker.Api.Extensions;
+using FinanceTracker.Application.Interfaces.Commands;
+using FinanceTracker.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceTracker.Api.Controllers;
@@ -8,20 +9,12 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class ChatController : ControllerBase
 {
-    private readonly ICommandProcessorService _commandProcessor;
-
-    public ChatController(ICommandProcessorService commandProcessor)
+    [HttpPost]
+    public async Task<IActionResult> ProcessMessage(
+        [FromServices] ICommandProcessorService service,
+        [FromBody] ChatMessageModel model)
     {
-        _commandProcessor = commandProcessor;
-    }
-
-    [HttpPost("command")]
-    public async Task<IActionResult> ExecuteCommand([FromBody] ChatCommandRequestDto dto)
-    {
-        if (string.IsNullOrWhiteSpace(dto.Message))
-            return BadRequest(new { message = "Message is required." });
-
-        var response = await _commandProcessor.ProcessCommandAsync(dto.Message);
-        return Ok(response);
+        var result = await service.ProcessCommandAsync(model.Message);
+        return result.Ok();
     }
 }

@@ -1,5 +1,5 @@
-using System.Text.Json;
-using FinanceTracker.Api.Services.Telegram;
+using FinanceTracker.Domain.Http.Telegram;
+using FinanceTracker.Domain.Http.Telegram.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceTracker.Api.Controllers;
@@ -8,17 +8,12 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class TelegramController : ControllerBase
 {
-    private readonly ITelegramBotService _telegramBotService;
-
-    public TelegramController(ITelegramBotService telegramBotService)
-    {
-        _telegramBotService = telegramBotService;
-    }
-
     [HttpPost("webhook")]
-    public async Task<IActionResult> ReceiveWebhook([FromBody] JsonElement update)
+    public async Task<IActionResult> ReceiveWebhook(
+        [FromServices] ITelegramService telegramService,
+        [FromBody] TelegramUpdateModel update)
     {
-        await _telegramBotService.HandleUpdateAsync(update);
+        await telegramService.SendMessageAsync(update.Message?.Chat.Id ?? 0, "Webhook recebido");
         return Ok();
     }
 }

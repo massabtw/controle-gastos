@@ -1,6 +1,6 @@
-using FinanceTracker.Api.Domain.Entities;
-using FinanceTracker.Api.Domain.Services;
-using FinanceTracker.Api.Services.Ai;
+using FinanceTracker.Application.Services.Ai;
+using FinanceTracker.Domain.Entities;
+using FinanceTracker.Domain.Services;
 using Xunit;
 
 namespace FinanceTracker.Tests;
@@ -23,7 +23,7 @@ public class BillingCycleCalculatorTests
     [Fact]
     public void GetCommitmentInstallmentStatus_RecurringFixed_ShouldBeFixo()
     {
-        var commitment = new FixedCommitment
+        var commitment = new FixedCommitmentEntity
         {
             Title = "Internet Móvel Mãe",
             Amount = 50.00m,
@@ -40,7 +40,7 @@ public class BillingCycleCalculatorTests
     [Fact]
     public void GetCommitmentInstallmentStatus_FixedInstallments_ShouldTrackAndExpire()
     {
-        var commitment = new FixedCommitment
+        var commitment = new FixedCommitmentEntity
         {
             Title = "Monitor Mãe",
             Amount = 120.00m,

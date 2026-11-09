@@ -1,4 +1,4 @@
-using FinanceTracker.Api.Services.Ai;
+using FinanceTracker.Application.Services.Ai;
 using Xunit;
 
 namespace FinanceTracker.Tests;

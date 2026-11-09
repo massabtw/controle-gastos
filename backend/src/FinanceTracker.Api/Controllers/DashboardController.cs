@@ -1,4 +1,5 @@
-using FinanceTracker.Api.Services;
+using FinanceTracker.Api.Extensions;
+using FinanceTracker.Application.Interfaces.FinancialEngine;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceTracker.Api.Controllers;
@@ -7,25 +8,12 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class DashboardController : ControllerBase
 {
-    private readonly IFinancialEngineService _financialEngineService;
-
-    public DashboardController(IFinancialEngineService financialEngineService)
-    {
-        _financialEngineService = financialEngineService;
-    }
-
     [HttpGet]
-    public async Task<IActionResult> GetDashboardSummary([FromQuery] string? cycle)
+    public async Task<IActionResult> GetSummary(
+        [FromServices] IFinancialEngineService service,
+        [FromQuery] string? cycle = null)
     {
-        var summary = await _financialEngineService.GetDashboardSummaryAsync(cycle);
-        return Ok(summary);
-    }
-
-    [HttpGet("projections")]
-    public async Task<IActionResult> GetProjections([FromQuery] int months = 6)
-    {
-        var clampedMonths = Math.Clamp(months, 1, 24);
-        var projections = await _financialEngineService.GetProjectionsAsync(clampedMonths);
-        return Ok(projections);
+        var result = await service.GetDashboardSummaryAsync(cycle);
+        return result.Ok();
     }
 }

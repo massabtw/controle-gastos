@@ -1,5 +1,7 @@
-using FinanceTracker.Api.Domain.Entities;
-using FinanceTracker.Api.Infrastructure.Repositories;
+using FinanceTracker.Api.Extensions;
+using FinanceTracker.Application.Interfaces.Commitments;
+using FinanceTracker.Application.Interfaces.Profile;
+using FinanceTracker.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceTracker.Api.Controllers;
@@ -8,164 +10,82 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class ProfileController : ControllerBase
 {
-    private readonly IProfileRepository _profileRepository;
-
-    public ProfileController(IProfileRepository profileRepository)
-    {
-        _profileRepository = profileRepository;
-    }
-
     [HttpGet]
-    public async Task<IActionResult> GetProfile()
+    public async Task<IActionResult> GetProfile(
+        [FromServices] IFinancialProfileService service)
     {
-        var profile = await _profileRepository.GetProfileAsync();
-        var commitments = await _profileRepository.GetFixedCommitmentsAsync(onlyActive: false);
-
-        return Ok(new
-        {
-            profile,
-            commitments
-        });
+        var result = await service.GetProfileAsync();
+        return result.Ok();
     }
 
     [HttpPut]
-    public async Task<IActionResult> UpdateProfile([FromBody] FinancialProfile profile)
+    public async Task<IActionResult> UpdateProfile(
+        [FromServices] IFinancialProfileService service,
+        [FromBody] UpdateFinancialProfileModel model)
     {
-        var success = await _profileRepository.UpdateProfileAsync(profile);
-        if (!success)
-            return BadRequest(new { message = "Could not update profile." });
-
-        return Ok(new { message = "Profile updated successfully.", profile });
+        var result = await service.UpdateProfileAsync(model);
+        return result.Ok();
     }
 
-    [HttpPost("caixinha")]
-    public async Task<IActionResult> UpdateCaixinha([FromBody] Domain.Dtos.UpdateCaixinhaDto dto)
+    [HttpPut("card-limit")]
+    public async Task<IActionResult> UpdateCardLimit(
+        [FromServices] IFinancialProfileService service,
+        [FromBody] UpdateCreditCardLimitModel model)
     {
-        if (dto.Balance < 0)
-            return BadRequest(new { message = "Balance cannot be negative." });
+        var result = await service.UpdateCardLimitAsync(model);
+        return result.Ok();
+    }
 
-        var success = await _profileRepository.UpdateCaixinhaBalanceAsync(dto.Balance);
-        if (!success)
-            return BadRequest(new { message = "Could not update Caixinha balance." });
-
-        return Ok(new { message = "Caixinha balance updated successfully.", balance = dto.Balance });
+    [HttpPut("caixinha")]
+    public async Task<IActionResult> UpdateCaixinhaBalance(
+        [FromServices] IFinancialProfileService service,
+        [FromBody] decimal balance)
+    {
+        var result = await service.UpdateCaixinhaBalanceAsync(balance);
+        return result.Ok();
     }
 
     [HttpPost("caixinha/deposit")]
-    public async Task<IActionResult> DepositCaixinha([FromBody] Domain.Dtos.DepositCaixinhaDto dto)
+    public async Task<IActionResult> DepositCaixinha(
+        [FromServices] IFinancialProfileService service,
+        [FromBody] CaixinhaDepositModel model)
     {
-        if (dto.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        var newBalance = await _profileRepository.DepositCaixinhaAsync(dto.Amount);
-        return Ok(new
-        {
-            message = $"R$ {dto.Amount:F2} adicionados à Caixinha com sucesso.",
-            amount = dto.Amount,
-            balance = newBalance
-        });
+        var result = await service.DepositCaixinhaAsync(model.Amount);
+        return result.Ok();
     }
 
-    [HttpPatch("card-limit")]
-    public async Task<IActionResult> UpdateCardLimit([FromBody] Domain.Dtos.UpdateCardLimitDto dto)
+    [HttpGet("subscriptions")]
+    public async Task<IActionResult> GetSubscriptions(
+        [FromServices] IFixedCommitmentService commitmentService)
     {
-        if (dto.CreditCardLimit <= 0)
-            return BadRequest(new { message = "Credit card limit must be greater than zero." });
+        var allResult = await commitmentService.GetAllAsync(onlyActive: true);
+        if (!allResult.IsSuccess || allResult.Value == null)
+            return allResult.Ok();
 
-        if (dto.CustomCardCap.HasValue && dto.CustomCardCap.Value <= 0)
-            dto.CustomCardCap = null;
+        var subs = allResult.Value
+            .Where(c => c.CommitmentType == "SUBSCRIPTION")
+            .OrderBy(c => c.BillingDay ?? 1);
 
-        var success = await _profileRepository.UpdateCardLimitAsync(dto.CreditCardLimit, dto.CustomCardCap);
-        if (!success)
-            return BadRequest(new { message = "Could not update credit card limit." });
-
-        return Ok(new
-        {
-            message = "Credit card limit updated successfully.",
-            creditCardLimit = dto.CreditCardLimit,
-            customCardCap = dto.CustomCardCap
-        });
+        return Ok(subs);
     }
 
-    [HttpPost("commitments/{id:int}/toggle-paid")]
-    public async Task<IActionResult> TogglePaid(int id, [FromQuery] string? cycle)
+    [HttpPost("subscriptions")]
+    public async Task<IActionResult> AddSubscription(
+        [FromServices] IFixedCommitmentService commitmentService,
+        [FromBody] CreateFixedCommitmentModel model)
     {
-        var profile = await _profileRepository.GetProfileAsync();
-        var targetCycle = string.IsNullOrWhiteSpace(cycle)
-            ? Domain.Services.BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
-            : cycle;
-
-        var (success, isPaid, balanceAfter) = await _profileRepository.ToggleCommitmentPaidAsync(id, targetCycle);
-        if (!success)
-            return BadRequest(new { message = "Could not toggle commitment paid state." });
-
-        return Ok(new
-        {
-            message = isPaid ? "Commitment marked as paid." : "Commitment unmarked as paid and refunded.",
-            isPaid,
-            cycle = targetCycle,
-            balanceAfter
-        });
+        model.CommitmentType = "SUBSCRIPTION";
+        model.TotalInstallments = null;
+        var result = await commitmentService.CreateAsync(model);
+        return result.Created();
     }
 
-    [HttpPost("commitments/{id:int}/pay-from-caixinha")]
-    public async Task<IActionResult> PayCommitmentFromCaixinha(int id, [FromQuery] string? cycle)
+    [HttpDelete("subscriptions/{id:int}")]
+    public async Task<IActionResult> DeleteSubscription(
+        [FromServices] IFixedCommitmentService commitmentService,
+        int id)
     {
-        return await TogglePaid(id, cycle);
-    }
-
-    [HttpPost("commitments")]
-    public async Task<IActionResult> AddCommitment([FromBody] FixedCommitment commitment)
-    {
-        if (string.IsNullOrWhiteSpace(commitment.Title))
-            return BadRequest(new { message = "Title is required." });
-
-        if (commitment.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        var profile = await _profileRepository.GetProfileAsync();
-        var currentActiveCycle = Domain.Services.BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
-
-        if (string.Equals(commitment.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase))
-        {
-            // A subscription cannot be retroactively billed to an already closed past cycle.
-            // If empty or set to a past closed cycle, default to current active open cycle.
-            if (string.IsNullOrWhiteSpace(commitment.StartCycle) ||
-                string.CompareOrdinal(commitment.StartCycle, currentActiveCycle) < 0)
-            {
-                commitment.StartCycle = currentActiveCycle;
-            }
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(commitment.StartCycle))
-                commitment.StartCycle = currentActiveCycle;
-        }
-
-        var id = await _profileRepository.AddFixedCommitmentAsync(commitment);
-        commitment.Id = id;
-
-        return StatusCode(201, commitment);
-    }
-
-    [HttpPut("commitments/{id:int}")]
-    public async Task<IActionResult> UpdateCommitment(int id, [FromBody] FixedCommitment commitment)
-    {
-        commitment.Id = id;
-        var success = await _profileRepository.UpdateFixedCommitmentAsync(commitment);
-        if (!success)
-            return NotFound(new { message = "Commitment not found." });
-
-        return Ok(new { message = "Commitment updated successfully." });
-    }
-
-    [HttpDelete("commitments/{id:int}")]
-    public async Task<IActionResult> DeleteCommitment(int id)
-    {
-        var success = await _profileRepository.DeleteFixedCommitmentAsync(id);
-        if (!success)
-            return NotFound(new { message = "Commitment not found." });
-
-        return Ok(new { message = "Commitment deleted successfully." });
+        var result = await commitmentService.DeleteAsync(id);
+        return result.NoContent();
     }
 }

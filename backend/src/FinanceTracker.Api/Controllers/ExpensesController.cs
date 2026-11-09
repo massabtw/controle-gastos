@@ -1,5 +1,6 @@
-using FinanceTracker.Api.Domain.Dtos;
-using FinanceTracker.Api.Services;
+using FinanceTracker.Api.Extensions;
+using FinanceTracker.Application.Interfaces.Expenses;
+using FinanceTracker.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceTracker.Api.Controllers;
@@ -8,109 +9,61 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class ExpensesController : ControllerBase
 {
-    private readonly IExpenseService _expenseService;
-
-    public ExpensesController(IExpenseService expenseService)
-    {
-        _expenseService = expenseService;
-    }
-
     [HttpGet]
-    public async Task<IActionResult> GetExpenses([FromQuery] string? cycle)
+    public async Task<IActionResult> GetExpenses(
+        [FromServices] IExpenseService service,
+        [FromQuery] string cycle)
     {
-        var expenses = await _expenseService.GetExpensesByCycleAsync(cycle);
-        return Ok(expenses);
-    }
+        if (string.IsNullOrWhiteSpace(cycle))
+            return BadRequest(new { message = "Parameter 'cycle' is required (format: YYYY-MM)." });
 
-    [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetExpense(int id)
-    {
-        var expense = await _expenseService.GetExpenseByIdAsync(id);
-        if (expense == null)
-            return NotFound(new { message = $"Expense {id} not found" });
-
-        return Ok(expense);
+        var result = await service.GetExpensesByCycleAsync(cycle);
+        return result.Ok();
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateExpense([FromBody] CreateExpenseDto dto)
+    public async Task<IActionResult> CreateExpense(
+        [FromServices] IExpenseService service,
+        [FromBody] CreateExpenseModel model)
     {
-        if (dto.TotalAmount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        if (string.IsNullOrWhiteSpace(dto.Description))
-            return BadRequest(new { message = "Description is required." });
-
-        var created = await _expenseService.CreateExpenseAsync(dto);
-        return StatusCode(201, created);
-    }
-
-    [HttpPost("pix-caixinha")]
-    public async Task<IActionResult> CreatePixCaixinha([FromBody] CreatePixCaixinhaDto dto)
-    {
-        if (dto.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        if (string.IsNullOrWhiteSpace(dto.Description))
-            return BadRequest(new { message = "Description is required." });
-
-        var created = await _expenseService.CreatePixCaixinhaExpenseAsync(dto);
-        return StatusCode(201, created);
+        var result = await service.CreateExpenseAsync(model);
+        return result.Created();
     }
 
     [HttpPost("receive-pix")]
-    public async Task<IActionResult> ReceivePix([FromBody] ReceivePixInflowDto dto)
+    public async Task<IActionResult> ReceivePix(
+        [FromServices] IExpenseService service,
+        [FromBody] ReceivePixModel model)
     {
-        if (dto.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        if (string.IsNullOrWhiteSpace(dto.Description))
-            return BadRequest(new { message = "Description is required." });
-
-        var created = await _expenseService.ReceivePixInflowAsync(dto);
-        return StatusCode(201, created);
+        var result = await service.ReceivePixAsync(model);
+        return result.Created();
     }
 
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> UpdateExpense(int id, [FromBody] UpdateExpenseDto dto)
+    [HttpPost("pix-caixinha")]
+    public async Task<IActionResult> CreatePixCaixinhaExpense(
+        [FromServices] IExpenseService service,
+        [FromBody] CreateExpenseModel model)
     {
-        if (dto.Amount <= 0)
-            return BadRequest(new { message = "Amount must be greater than zero." });
-
-        if (string.IsNullOrWhiteSpace(dto.Description))
-            return BadRequest(new { message = "Description is required." });
-
-        var success = await _expenseService.UpdateExpenseAsync(id, dto);
-        if (!success)
-            return NotFound(new { message = $"Expense {id} not found." });
-
-        return Ok(new { message = "Expense updated successfully." });
+        model.PaymentMethod = "PIX_CAIXINHA";
+        model.Installments = 1;
+        var result = await service.CreateExpenseAsync(model);
+        return result.Created();
     }
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteExpense(int id, [FromQuery] bool deleteAllInstallments = false)
+    public async Task<IActionResult> DeleteExpense(
+        [FromServices] IExpenseService service,
+        int id)
     {
-        var success = await _expenseService.DeleteExpenseAsync(id, deleteAllInstallments);
-        if (!success)
-            return NotFound(new { message = $"Expense {id} not found." });
-
-        return Ok(new { message = "Expense deleted successfully." });
+        var result = await service.DeleteExpenseAsync(id);
+        return result.NoContent();
     }
 
-    [HttpPost("undo")]
-    public async Task<IActionResult> UndoLatest()
+    [HttpPost("undo-last")]
+    public async Task<IActionResult> UndoLastExpense(
+        [FromServices] IExpenseService service)
     {
-        var message = await _expenseService.UndoLatestExpenseAsync();
-        return Ok(new { message });
-    }
-
-    [HttpPost("sync-invoice")]
-    public async Task<IActionResult> SyncInvoice([FromBody] SyncInvoiceDto dto)
-    {
-        if (dto.TargetTotal < 0)
-            return BadRequest(new { message = "Target total cannot be negative." });
-
-        var newTotal = await _expenseService.SyncInvoiceTotalAsync(dto.TargetTotal, dto.Cycle);
-        return Ok(new { message = "Invoice synchronized successfully.", currentInvoiceTotal = newTotal });
+        var result = await service.DeleteLastExpenseAsync();
+        return result.Ok();
     }
 }

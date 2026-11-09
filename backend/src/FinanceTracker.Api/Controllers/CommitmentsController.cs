@@ -1,5 +1,6 @@
-using FinanceTracker.Api.Domain.Services;
-using FinanceTracker.Api.Infrastructure.Repositories;
+using FinanceTracker.Api.Extensions;
+using FinanceTracker.Application.Interfaces.Commitments;
+using FinanceTracker.Application.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FinanceTracker.Api.Controllers;
@@ -8,37 +9,59 @@ namespace FinanceTracker.Api.Controllers;
 [Route("api/[controller]")]
 public class CommitmentsController : ControllerBase
 {
-    private readonly IProfileRepository _profileRepository;
-
-    public CommitmentsController(IProfileRepository profileRepository)
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromServices] IFixedCommitmentService service,
+        [FromQuery] bool onlyActive = true)
     {
-        _profileRepository = profileRepository;
+        var result = await service.GetAllAsync(onlyActive);
+        return result.Ok();
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(
+        [FromServices] IFixedCommitmentService service,
+        int id)
+    {
+        var result = await service.GetByIdAsync(id);
+        return result.Ok();
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create(
+        [FromServices] IFixedCommitmentService service,
+        [FromBody] CreateFixedCommitmentModel model)
+    {
+        var result = await service.CreateAsync(model);
+        return result.Created();
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(
+        [FromServices] IFixedCommitmentService service,
+        int id,
+        [FromBody] CreateFixedCommitmentModel model)
+    {
+        var result = await service.UpdateAsync(id, model);
+        return result.NoContent();
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(
+        [FromServices] IFixedCommitmentService service,
+        int id)
+    {
+        var result = await service.DeleteAsync(id);
+        return result.NoContent();
     }
 
     [HttpPost("{id:int}/toggle-paid")]
-    public async Task<IActionResult> TogglePaid(int id, [FromQuery] string? cycle)
+    public async Task<IActionResult> TogglePaid(
+        [FromServices] IFixedCommitmentService service,
+        int id,
+        [FromQuery] string? cycle = null)
     {
-        var profile = await _profileRepository.GetProfileAsync();
-        var targetCycle = string.IsNullOrWhiteSpace(cycle)
-            ? BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay)
-            : cycle;
-
-        var (success, isPaid, balanceAfter) = await _profileRepository.ToggleCommitmentPaidAsync(id, targetCycle);
-        if (!success)
-            return BadRequest(new { message = "Could not toggle commitment paid state." });
-
-        return Ok(new
-        {
-            message = isPaid ? "Commitment marked as paid." : "Commitment unmarked as paid and refunded.",
-            isPaid,
-            cycle = targetCycle,
-            balanceAfter
-        });
-    }
-
-    [HttpPost("{id:int}/pay-from-caixinha")]
-    public async Task<IActionResult> PayFromCaixinha(int id, [FromQuery] string? cycle)
-    {
-        return await TogglePaid(id, cycle);
+        var result = await service.TogglePaidAsync(id, cycle);
+        return result.Ok();
     }
 }
