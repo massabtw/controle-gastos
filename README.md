@@ -63,3 +63,49 @@ Pressione `/` no teclado na página inicial para focar a barra de comando ou env
 | **Simular compra** | Mostra o impacto no limite diário e se invade a meta | `"simular 400 4x"`, `"simular 150"` |
 | **Ver status** | Exibe resumo da fatura e teto | `"/status"` ou `"status"` |
 | **Desfazer** | Apaga o último lançamento feito | `"/desfazer"` ou `"desfazer"` |
+
+---
+
+## 🍏 Integração iOS Shortcuts & Apple Pay (ISSUE #10)
+
+Integração nativa para sincronização instantânea a partir do iPhone com retorno de notificação em banner e push proativo no Telegram:
+
+- **Endpoint:** `POST https://controle-gastos-3nor.onrender.com/api/integrations/ios-shortcut`
+- **Headers:** `Content-Type: application/json`
+
+### 1. Automação de Transação (Apple Pay)
+Crie uma automação pessoal no app **Atalhos** do iOS:
+1. Gatilho: **Transação** (ao pagar com qualquer cartão no Apple Pay).
+2. Ação: **Obter Conteúdo do URL** (`POST`).
+3. Corpo da Requisição (JSON):
+```json
+{
+  "merchant": "Comerciante",
+  "amount": "Valor",
+  "paymentMethod": "CARD",
+  "secretPin": "1234"
+}
+```
+
+### 2. Captura OCR de Comprovante Pix Nubank (Tocar Atrás / Back Tap)
+1. Gatilho: Toque duplo/triplo na traseira do iPhone (`Acessibilidade > Toque > Tocar Atrás`).
+2. Ações: Tirar captura de tela -> Extrair texto de imagem (OCR nativo) -> **Obter Conteúdo do URL** (`POST`):
+```json
+{
+  "rawText": "Texto extraído da captura",
+  "paymentMethod": "PIX_CAIXINHA",
+  "secretPin": "1234"
+}
+```
+
+### 3. Retorno do Endpoint (Para Banner do iOS)
+```json
+{
+  "success": true,
+  "message": "✅ R$ 42,50 em McDonald's registrado! Novo teto: R$ 31,20/dia",
+  "expense": { ... },
+  "dailyBurnRate": 31.20,
+  "remainingCap": 624.00
+}
+```
+E simultaneamente envia uma notificação push proativa no Telegram com resumo do ciclo e teto atualizado.
