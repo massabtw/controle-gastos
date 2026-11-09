@@ -1634,6 +1634,7 @@ export function EditCardLimitModal({
 interface NewSubscriptionModalProps {
   isOpen: boolean;
   currentCycle?: string;
+  activeCycle?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -1641,14 +1642,24 @@ interface NewSubscriptionModalProps {
 export function NewSubscriptionModal({
   isOpen,
   currentCycle,
+  activeCycle,
   onClose,
   onSuccess,
 }: NewSubscriptionModalProps) {
+  const defaultCycle = activeCycle || currentCycle || new Date().toISOString().substring(0, 7);
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [billingDay, setBillingDay] = useState(10);
+  const [startCycle, setStartCycle] = useState(defaultCycle);
   const [paymentSource, setPaymentSource] = useState<'CARD' | 'PIX_CAIXINHA'>('CARD');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const cycle = activeCycle || currentCycle || new Date().toISOString().substring(0, 7);
+      setStartCycle(cycle);
+    }
+  }, [isOpen, activeCycle, currentCycle]);
 
   if (!isOpen) return null;
 
@@ -1659,7 +1670,7 @@ export function NewSubscriptionModal({
 
     setLoading(true);
     try {
-      const cycle = currentCycle || new Date().toISOString().substring(0, 7);
+      const cycle = startCycle.trim() || activeCycle || currentCycle || new Date().toISOString().substring(0, 7);
       await api.addCommitment({
         title: title.trim(),
         amount,
@@ -1763,6 +1774,22 @@ export function NewSubscriptionModal({
                 />
               </div>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1">
+              Fatura de Início da Cobrança
+            </label>
+            <input
+              type="month"
+              required
+              value={startCycle}
+              onChange={(e) => setStartCycle(e.target.value)}
+              className="w-full bg-zinc-950/70 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm font-mono text-zinc-100 focus:outline-none focus:border-purple-500"
+            />
+            <p className="text-[11px] text-zinc-500 mt-1">
+              🔒 A cobrança só entra a partir deste ciclo ({startCycle}). Faturas fechadas anteriores a ele não são alteradas.
+            </p>
           </div>
 
           {/* Payment Source Selector */}

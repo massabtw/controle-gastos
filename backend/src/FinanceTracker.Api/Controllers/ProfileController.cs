@@ -123,8 +123,24 @@ public class ProfileController : ControllerBase
         if (commitment.Amount <= 0)
             return BadRequest(new { message = "Amount must be greater than zero." });
 
-        if (string.IsNullOrWhiteSpace(commitment.StartCycle))
-            return BadRequest(new { message = "StartCycle (YYYY-MM) is required." });
+        var profile = await _profileRepository.GetProfileAsync();
+        var currentActiveCycle = Domain.Services.BillingCycleCalculator.GetTargetBillingCycle(DateTime.Now, profile.ClosingDay);
+
+        if (string.Equals(commitment.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase))
+        {
+            // A subscription cannot be retroactively billed to an already closed past cycle.
+            // If empty or set to a past closed cycle, default to current active open cycle.
+            if (string.IsNullOrWhiteSpace(commitment.StartCycle) ||
+                string.CompareOrdinal(commitment.StartCycle, currentActiveCycle) < 0)
+            {
+                commitment.StartCycle = currentActiveCycle;
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(commitment.StartCycle))
+                commitment.StartCycle = currentActiveCycle;
+        }
 
         var id = await _profileRepository.AddFixedCommitmentAsync(commitment);
         commitment.Id = id;

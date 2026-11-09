@@ -262,7 +262,8 @@ export default function Home() {
 
       <NewSubscriptionModal
         isOpen={isNewSubscriptionOpen}
-        currentCycle={selectedCycle || summary?.billingCycle}
+        activeCycle={summary?.currentActiveCycle || summary?.billingCycle}
+        currentCycle={summary?.currentActiveCycle || summary?.billingCycle}
         onClose={() => setIsNewSubscriptionOpen(false)}
         onSuccess={loadData}
       />

@@ -20,6 +20,7 @@ export interface CategoryBreakdown {
 
 export interface DashboardSummary {
   billingCycle: string;
+  currentActiveCycle?: string;
   cycleClosingDate: string;
   cycleDueDate: string;
   cycleState: 'CURRENT' | 'FUTURE' | 'CLOSED';

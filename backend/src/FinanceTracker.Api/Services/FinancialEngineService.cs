@@ -48,6 +48,14 @@ public class FinancialEngineService : IFinancialEngineService
 
             if (isSubscription)
             {
+                // Subscriptions only take effect from their StartCycle onwards.
+                // If targetCycle is before the StartCycle (e.g. a past closed invoice), it does NOT count.
+                if (!string.IsNullOrWhiteSpace(commitment.StartCycle) &&
+                    string.CompareOrdinal(targetCycle, commitment.StartCycle) < 0)
+                {
+                    continue;
+                }
+
                 activeSubscriptionsList.Add(new ActiveCommitmentDto
                 {
                     Id = commitment.Id,
@@ -182,6 +190,7 @@ public class FinancialEngineService : IFinancialEngineService
         return new DashboardSummaryDto
         {
             BillingCycle = targetCycle,
+            CurrentActiveCycle = currentActiveCycle,
             CycleClosingDate = closingDate,
             CycleDueDate = dueDate,
             CycleState = cycleState,
@@ -252,12 +261,6 @@ public class FinancialEngineService : IFinancialEngineService
         var allExpensesInCycles = (await _expenseRepository.GetExpensesInCyclesAsync(cycles)).ToList();
         var projections = new List<ProjectionCycleDto>();
 
-        // Recurring card subscriptions amount per month
-        var monthlyCardSubscriptions = allCommitments
-            .Where(c => string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(c.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase))
-            .Sum(c => c.Amount);
-
         foreach (var cycle in cycles)
         {
             decimal fixedCommitmentsTotal = 0m;
@@ -270,9 +273,15 @@ public class FinancialEngineService : IFinancialEngineService
                 }
             }
 
+            var cardSubscriptionsInCycle = allCommitments
+                .Where(c => string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(c.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase) &&
+                            (string.IsNullOrWhiteSpace(c.StartCycle) || string.CompareOrdinal(cycle, c.StartCycle) >= 0))
+                .Sum(c => c.Amount);
+
             var cardInstallments = allExpensesInCycles
                 .Where(e => e.BillingCycle == cycle && e.PaymentMethod == "CARD")
-                .Sum(e => e.Amount) + monthlyCardSubscriptions;
+                .Sum(e => e.Amount) + cardSubscriptionsInCycle;
 
             var baseCap = (profile.CustomCardCap.HasValue && profile.CustomCardCap.Value > 0)
                 ? profile.CustomCardCap.Value

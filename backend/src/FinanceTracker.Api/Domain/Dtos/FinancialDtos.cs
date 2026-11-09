@@ -43,6 +43,7 @@ public class CategoryBreakdownDto
 public class DashboardSummaryDto
 {
     public string BillingCycle { get; set; } = string.Empty;
+    public string CurrentActiveCycle { get; set; } = string.Empty;
     public DateTime CycleClosingDate { get; set; }
     public DateTime CycleDueDate { get; set; }
     public string CycleState { get; set; } = "CURRENT"; // "CURRENT", "FUTURE", "CLOSED"
