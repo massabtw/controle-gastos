@@ -153,12 +153,11 @@ public class FinancialEngineService : IFinancialEngineService
                 : Math.Max(0, secondTrancheAmount - currentInvoiceTotal);
             var isSurplusInvested = isInvoicePaid && (invoicePayment?.SurplusInvested ?? false);
 
-            // Available Bank Credit Limit
+            // Available Bank Credit Limit (Global across all billing cycles)
             var bankLimit = profile.CreditCardLimit > 0 ? profile.CreditCardLimit : 2500.00m;
-            var allCommittedCardExpenses = await _unitOfWork.CardExpense.GetTotalCommittedCardExpensesFromCycleAsync(inspectedCycle);
+            var totalUnpaidCardUsage = await _unitOfWork.CardExpense.GetTotalUnpaidCardExpensesAsync();
             var totalFutureInstallmentsOnCard = await _unitOfWork.CardExpense.GetFutureCommittedInstallmentsTotalAsync(inspectedCycle);
-            var committedToDeduct = isInvoicePaid ? Math.Max(0, allCommittedCardExpenses - manualCardExpensesTotal) : allCommittedCardExpenses;
-            var availableBankCreditLimit = Math.Max(0, bankLimit - committedToDeduct - cardSubscriptionsTotal);
+            var availableBankCreditLimit = Math.Max(0, bankLimit - totalUnpaidCardUsage);
 
             // Category breakdown (include subscriptions category)
             var allCardItems = cycleExpensesEntities
@@ -218,6 +217,7 @@ public class FinancialEngineService : IFinancialEngineService
                 CreditCardLimit = bankLimit,
                 CustomCardCap = profile.CustomCardCap,
                 AvailableBankCreditLimit = availableBankCreditLimit,
+                TotalUnpaidCardUsage = totalUnpaidCardUsage,
                 CreditCardBankLimit = bankLimit,
                 TotalInstallmentsOnCard = totalFutureInstallmentsOnCard,
                 BankLimitAvailable = availableBankCreditLimit,

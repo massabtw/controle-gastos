@@ -31,6 +31,7 @@ export interface DashboardSummary {
   creditCardLimit: number;
   customCardCap: number | null;
   availableBankCreditLimit: number;
+  totalUnpaidCardUsage?: number;
   activeFixedCommitments: ActiveCommitment[];
   totalFixedCommitments: number;
   activeSubscriptions: ActiveCommitment[];

@@ -64,6 +64,7 @@ public class InvoiceServiceTests
         public Task<int> DeleteByPurchaseGroupIdAsync(Guid purchaseGroupId) => Task.FromResult(1);
         public Task<decimal> GetFutureCommittedInstallmentsTotalAsync(string targetCycle) => Task.FromResult(0m);
         public Task<decimal> GetTotalCommittedCardExpensesFromCycleAsync(string fromCycle) => Task.FromResult(0m);
+        public Task<decimal> GetTotalUnpaidCardExpensesAsync() => Task.FromResult(0m);
         public Task<Dictionary<string, decimal>> GetFutureCommittedInstallmentsByCycleAsync(string startCycle, int monthsAhead) => Task.FromResult(new Dictionary<string, decimal>());
     }
 

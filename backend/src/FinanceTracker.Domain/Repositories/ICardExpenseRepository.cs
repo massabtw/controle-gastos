@@ -19,5 +19,6 @@ public interface ICardExpenseRepository
     Task<int> DeleteByPurchaseGroupIdAsync(Guid purchaseGroupId);
     Task<decimal> GetFutureCommittedInstallmentsTotalAsync(string targetCycle);
     Task<decimal> GetTotalCommittedCardExpensesFromCycleAsync(string fromCycle);
+    Task<decimal> GetTotalUnpaidCardExpensesAsync();
     Task<Dictionary<string, decimal>> GetFutureCommittedInstallmentsByCycleAsync(string startCycle, int monthsAhead);
 }

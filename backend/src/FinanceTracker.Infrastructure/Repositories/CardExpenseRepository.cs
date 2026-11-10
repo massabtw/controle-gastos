@@ -272,6 +272,35 @@ public class CardExpenseRepository : ICardExpenseRepository
         return await _unitOfWork.Connection.ExecuteScalarAsync<decimal>(sql, new { fromCycle }, _unitOfWork.Transaction);
     }
 
+    public async Task<decimal> GetTotalUnpaidCardExpensesAsync()
+    {
+        var sql = _unitOfWork.IsPostgres
+            ? @"SELECT COALESCE(SUM(c.Amount), 0.00)
+                FROM CardExpenses c
+                WHERE c.PaymentMethod = 'CARD'
+                  AND c.Deleted = FALSE
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM InvoicePayments p
+                      WHERE p.BillingCycle = c.BillingCycle
+                        AND p.IsPaid = TRUE
+                        AND p.Deleted = FALSE
+                  );"
+            : @"SELECT ISNULL(SUM(c.Amount), 0.00)
+                FROM dbo.CardExpenses c
+                WHERE c.PaymentMethod = 'CARD'
+                  AND c.Deleted = 0
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM dbo.InvoicePayments p
+                      WHERE p.BillingCycle = c.BillingCycle
+                        AND p.IsPaid = 1
+                        AND p.Deleted = 0
+                  );";
+
+        return await _unitOfWork.Connection.ExecuteScalarAsync<decimal>(sql, transaction: _unitOfWork.Transaction);
+    }
+
     public async Task<Dictionary<string, decimal>> GetFutureCommittedInstallmentsByCycleAsync(string startCycle, int monthsAhead)
     {
         var endCycle = BillingCycleCalculator.AddMonthsToCycle(startCycle, monthsAhead);

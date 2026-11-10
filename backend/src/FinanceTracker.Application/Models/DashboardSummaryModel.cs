@@ -18,6 +18,7 @@ public class DashboardSummaryModel
     public decimal CreditCardLimit { get; set; } = 2500.00m;
     public decimal? CustomCardCap { get; set; }
     public decimal AvailableBankCreditLimit { get; set; }
+    public decimal TotalUnpaidCardUsage { get; set; }
     public decimal CreditCardBankLimit { get; set; }
     public decimal TotalInstallmentsOnCard { get; set; }
     public decimal BankLimitAvailable { get; set; }
