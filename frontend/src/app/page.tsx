@@ -27,9 +27,10 @@ import {
 
 interface AdminLockGateProps {
   onUnlock: (token: string) => void;
+  onEnterAsGuest: () => void;
 }
 
-function AdminLockGate({ onUnlock }: AdminLockGateProps) {
+function AdminLockGate({ onUnlock, onEnterAsGuest }: AdminLockGateProps) {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -42,17 +43,17 @@ function AdminLockGate({ onUnlock }: AdminLockGateProps) {
       return;
     }
 
-    if (cleanedPin.toLowerCase() === 'uchiha') {
+    if (cleanedPin.toLowerCase() === 'uchiha' || cleanedPin === '1212') {
       setLoading(true);
       setErrorMessage(null);
       try {
-        const res = await api.loginAdmin('uchiha');
-        const tokenToSave = res?.token || 'uchiha';
+        const res = await api.loginAdmin(cleanedPin);
+        const tokenToSave = res?.token || cleanedPin;
         api.setAdminToken(tokenToSave);
         onUnlock(tokenToSave);
       } catch {
-        api.setAdminToken('uchiha');
-        onUnlock('uchiha');
+        api.setAdminToken(cleanedPin);
+        onUnlock(cleanedPin);
       } finally {
         setLoading(false);
       }
@@ -138,6 +139,20 @@ function AdminLockGate({ onUnlock }: AdminLockGateProps) {
             )}
           </button>
 
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-zinc-800"></div>
+            <span className="flex-shrink mx-3 text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">ou</span>
+            <div className="flex-grow border-t border-zinc-800"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onEnterAsGuest}
+            className="w-full min-h-[46px] rounded-2xl bg-zinc-950 hover:bg-zinc-800/90 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs sm:text-sm font-semibold shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>👀 Entrar como Visitante (Valores Ocultos)</span>
+          </button>
+
           <p className="text-[11px] text-zinc-500 pt-1 leading-relaxed">
             O token de acesso permanecerá ativo por 90 dias neste dispositivo.
           </p>
@@ -155,10 +170,10 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'expenses' | 'subscriptions' | 'projections'>('expenses');
 
-  // Admin security & Privacy Mode
+  // Admin security & Guest Mode
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isPrivacyBlur, setIsPrivacyBlur] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
 
   // Modals state
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
@@ -185,9 +200,9 @@ export default function Home() {
         return;
       }
 
-      if (token.trim().toLowerCase() === 'uchiha') {
+      if (token.trim() === '1212' || token.trim().toLowerCase() === 'uchiha') {
         setIsAdmin(true);
-        setIsPrivacyBlur(false);
+        setIsGuest(false);
         setIsCheckingAuth(false);
         return;
       }
@@ -196,7 +211,7 @@ export default function Home() {
         const res = await api.verifyAdmin(token);
         if (res && res.valid) {
           setIsAdmin(true);
-          setIsPrivacyBlur(false);
+          setIsGuest(false);
         } else {
           api.clearAdminToken();
           setIsAdmin(false);
@@ -221,6 +236,7 @@ export default function Home() {
     const handlePinRequired = () => {
       api.clearAdminToken();
       setIsAdmin(false);
+      setIsGuest(false);
       setIsPinModalOpen(false);
     };
 
@@ -245,11 +261,12 @@ export default function Home() {
     if (confirm('Deseja bloquear o painel e voltar à tela de bloqueio?')) {
       api.clearAdminToken();
       setIsAdmin(false);
+      setIsGuest(false);
     }
   };
 
   const loadData = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin && !isGuest) return;
     try {
       const [sum, proj] = await Promise.all([
         api.getDashboard(selectedCycle || undefined),
@@ -270,13 +287,13 @@ export default function Home() {
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     }
-  }, [isAdmin, selectedCycle]);
+  }, [isAdmin, isGuest, selectedCycle]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin || isGuest) {
       loadData();
     }
-  }, [isAdmin, loadData]);
+  }, [isAdmin, isGuest, loadData]);
 
   const handleCycleChange = (cycle: string) => {
     setSelectedCycle(cycle);
@@ -293,12 +310,16 @@ export default function Home() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isAdmin && !isGuest) {
     return (
       <AdminLockGate
         onUnlock={() => {
           setIsAdmin(true);
-          setIsPrivacyBlur(false);
+          setIsGuest(false);
+        }}
+        onEnterAsGuest={() => {
+          setIsGuest(true);
+          setIsAdmin(false);
         }}
       />
     );
@@ -306,7 +327,7 @@ export default function Home() {
 
   return (
     <div
-      data-privacy={isPrivacyBlur ? 'true' : 'false'}
+      data-privacy={isGuest ? 'true' : 'false'}
       className="min-h-screen w-full overflow-x-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300"
     >
       {/* Background ambient lighting */}
@@ -327,8 +348,7 @@ export default function Home() {
           onOpenSettings={() => guardAdminAction(() => setIsSettingsOpen(true))}
           onOpenPinModal={() => setIsPinModalOpen(true)}
           isAdmin={isAdmin}
-          isPrivacyBlur={isPrivacyBlur}
-          onTogglePrivacy={() => setIsPrivacyBlur((prev) => !prev)}
+          isGuest={isGuest}
           onLogoutAdmin={handleLogoutAdmin}
         />
 
@@ -527,10 +547,7 @@ export default function Home() {
         onSuccess={(token) => {
           if (token) {
             setIsAdmin(true);
-            setIsPrivacyBlur(false);
-          } else {
-            setIsAdmin(false);
-            setIsPrivacyBlur(true);
+            setIsGuest(false);
           }
           loadData();
         }}

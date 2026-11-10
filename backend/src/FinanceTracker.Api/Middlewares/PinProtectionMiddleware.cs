@@ -18,14 +18,17 @@ public class PinProtectionMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // 1. Always allow OPTIONS pre-flight requests (CORS)
-        if (HttpMethods.IsOptions(context.Request.Method))
+        // 1. Allow safe read-only HTTP methods (GET, HEAD, OPTIONS) publicly
+        // This enables Guest Mode to load Dashboard, Expenses, Invoices in read-only mode
+        if (HttpMethods.IsGet(context.Request.Method) ||
+            HttpMethods.IsHead(context.Request.Method) ||
+            HttpMethods.IsOptions(context.Request.Method))
         {
             await _next(context);
             return;
         }
 
-        // 2. Allow public bypass endpoints:
+        // 2. Allow public bypass endpoints for state changes (POST/PUT/DELETE):
         // - Auth endpoints (/api/auth/login, /api/auth/verify)
         // - Telegram Webhook (/api/telegram/*)
         // - iOS Shortcut webhook (/api/integrations/ios-shortcut - protected by SecretPin)
@@ -44,7 +47,7 @@ public class PinProtectionMiddleware
             return;
         }
 
-        // 3. Protect ALL Dashboard endpoints (GET, POST, PUT, DELETE):
+        // 3. Protect state-changing requests (POST, PUT, PATCH, DELETE):
         var token = context.Request.Headers["X-Admin-Token"].FirstOrDefault()
             ?? context.Request.Headers["X-App-Pin"].FirstOrDefault()
             ?? context.Request.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "").Trim();
@@ -56,7 +59,7 @@ public class PinProtectionMiddleware
 
             var responseObj = new
             {
-                message = "Acesso não autorizado. Autentique-se como administrador para acessar o painel.",
+                message = "Ação restrita. Autentique-se como administrador para realizar alterações.",
                 requiresAuth = true
             };
             await context.Response.WriteAsync(JsonSerializer.Serialize(responseObj));

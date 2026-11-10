@@ -48,16 +48,12 @@ body {
   background: #3f3f46;
 }
 
-/* Privacy Blur for Sensitive Financial Figures */
+/* Forced Privacy Blur for Sensitive Financial Figures in Guest Mode */
 [data-privacy="true"] .privacy-sensitive,
 .privacy-blur {
-  filter: blur(7px);
+  filter: blur(8px);
   user-select: none;
+  pointer-events: none;
   transition: filter 0.2s ease-in-out;
-}
-
-/* Allow hovering to temporarily unblur if desired */
-[data-privacy="true"] .privacy-sensitive:hover {
-  filter: blur(0px);
 }
 

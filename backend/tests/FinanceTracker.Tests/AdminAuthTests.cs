@@ -92,7 +92,7 @@ public class AdminAuthTests
     }
 
     [Fact]
-    public async Task PinProtectionMiddleware_BlocksGetRequestsWithoutToken()
+    public async Task PinProtectionMiddleware_AllowsGetRequestsPublicly()
     {
         bool nextInvoked = false;
         var middleware = new PinProtectionMiddleware(
@@ -104,28 +104,6 @@ public class AdminAuthTests
         var context = new DefaultHttpContext();
         context.Request.Method = "GET";
         context.Request.Path = "/api/dashboard/summary";
-
-        await middleware.InvokeAsync(context);
-
-        Assert.False(nextInvoked);
-        Assert.Equal(401, context.Response.StatusCode);
-    }
-
-    [Fact]
-    public async Task PinProtectionMiddleware_AllowsGetRequestsWithValidToken()
-    {
-        bool nextInvoked = false;
-        var middleware = new PinProtectionMiddleware(
-            ctx => { nextInvoked = true; return Task.CompletedTask; },
-            _config,
-            NullLogger<PinProtectionMiddleware>.Instance
-        );
-
-        var token = AdminTokenHelper.GenerateToken("secret_pass_123");
-        var context = new DefaultHttpContext();
-        context.Request.Method = "GET";
-        context.Request.Path = "/api/dashboard/summary";
-        context.Request.Headers["X-Admin-Token"] = token;
 
         await middleware.InvokeAsync(context);
 

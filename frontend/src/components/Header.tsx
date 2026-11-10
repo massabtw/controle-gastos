@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft, Lock, Unlock } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeaderProps {
@@ -15,8 +15,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenPinModal?: () => void;
   isAdmin?: boolean;
-  isPrivacyBlur?: boolean;
-  onTogglePrivacy?: () => void;
+  isGuest?: boolean;
   onLogoutAdmin?: () => void;
 }
 
@@ -31,8 +30,7 @@ export function Header({
   onOpenSettings,
   onOpenPinModal,
   isAdmin = false,
-  isPrivacyBlur = false,
-  onTogglePrivacy,
+  isGuest = false,
   onLogoutAdmin,
 }: HeaderProps) {
   // Helper to step cycles
@@ -71,37 +69,29 @@ export function Header({
             </div>
             <p className="text-[11px] sm:text-xs text-zinc-400 flex items-center gap-1.5 mt-0.5 truncate">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="truncate">Fluxo Mensal & Teto R$ 1.030</span>
+              <span className="truncate">
+                Fluxo Mensal & <span className="privacy-sensitive font-mono">Teto R$ {summary ? summary.cardHardCap.toFixed(0) : '1.030'}</span>
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Mobile quick utility buttons: Eye Toggle, Admin/Visitante Badge, Regras */}
+        {/* Mobile quick utility buttons: Admin/Visitante Lock Status, Regras */}
         <div className="flex lg:hidden items-center gap-1.5 shrink-0">
-          {onTogglePrivacy && (
-            <button
-              onClick={onTogglePrivacy}
-              title={isPrivacyBlur ? 'Exibir valores reais' : 'Ocultar valores (Modo Privacidade)'}
-              className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border transition-colors shadow-sm cursor-pointer ${
-                isPrivacyBlur
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {isPrivacyBlur ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-zinc-400" />}
-            </button>
-          )}
-
           <button
             onClick={isAdmin ? onLogoutAdmin : onOpenPinModal}
-            title={isAdmin ? 'Você está como Administrador. Clique para bloquear.' : 'Modo Visitante (Apenas Leitura). Clique para desbloquear.'}
+            title={
+              isAdmin
+                ? 'Você está autenticado como Administrador. Clique para bloquear.'
+                : 'Modo Visitante (Valores Ocultos). Clique para desbloquear com PIN.'
+            }
             className={`min-h-[44px] px-2.5 flex items-center gap-1 rounded-xl border text-[11px] font-semibold transition-all shadow-sm cursor-pointer ${
               isAdmin
                 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
                 : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
             }`}
           >
-            {isAdmin ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-zinc-400" />}
+            {isAdmin ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
             <span>{isAdmin ? 'Admin' : 'Visitante'}</span>
           </button>
 
@@ -178,11 +168,11 @@ export function Header({
         </div>
       </div>
 
-      {/* Quick Action Buttons — Scrollable horizontal pill row on mobile */}
-      <div className="w-full lg:w-auto flex items-center overflow-x-auto no-scrollbar gap-2 py-1">
+      {/* Quick Action Buttons */}
+      <div className="w-full lg:w-auto flex flex-wrap items-center justify-start lg:justify-end gap-2 py-1">
         <button
           onClick={onOpenNewExpense}
-          className="min-h-[44px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs sm:text-sm font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-[0.98] cursor-pointer"
+          className="min-h-[40px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs sm:text-sm font-bold transition-all shadow-md shadow-emerald-500/20 active:scale-[0.98] cursor-pointer"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Novo Gasto</span>
@@ -192,7 +182,7 @@ export function Header({
           <button
             onClick={onOpenReceivePix}
             title="Registrar recebimento de Pix (vai diretamente para a Caixinha Nubank)"
-            className="min-h-[44px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
+            className="min-h-[40px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
           >
             <ArrowDownLeft className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Pix Recebido</span>
@@ -203,7 +193,7 @@ export function Header({
           <button
             onClick={onOpenPixCaixinha}
             title="Retirar dinheiro da Caixinha para pagar no Pix"
-            className="min-h-[44px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
+            className="min-h-[40px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
           >
             <Send className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>Retirar p/ Pix</span>
@@ -214,53 +204,39 @@ export function Header({
           <button
             onClick={onOpenSyncInvoice}
             title="Ajustar fatura com base no app Nubank"
-            className="min-h-[44px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/40 text-purple-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
+            className="min-h-[40px] shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/40 text-purple-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
           >
             <CreditCard className="w-4 h-4 text-purple-400 shrink-0" />
             <span>Ajustar Fatura</span>
           </button>
         )}
 
-        {onTogglePrivacy && (
+        {/* Status button on desktop: Guest vs Admin */}
+        {isGuest ? (
           <button
-            onClick={onTogglePrivacy}
-            title={isPrivacyBlur ? 'Exibir valores reais' : 'Ocultar valores (Modo Privacidade)'}
-            className={`hidden lg:flex min-h-[44px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer ${
-              isPrivacyBlur
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-                : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-            }`}
+            onClick={onOpenPinModal}
+            title="Modo Visitante (Valores Ocultos). Clique para entrar com o PIN de Administrador."
+            className="hidden lg:flex min-h-[40px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs sm:text-sm font-semibold transition-all shadow-sm cursor-pointer"
           >
-            {isPrivacyBlur ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-zinc-400" />}
-            <span>{isPrivacyBlur ? 'Oculto' : 'Visível'}</span>
+            <Lock className="w-4 h-4 text-amber-400" />
+            <span>🔒 Modo Visitante (Entrar)</span>
           </button>
-        )}
-
-        <button
-          onClick={isAdmin ? onLogoutAdmin : onOpenPinModal}
-          title={isAdmin ? 'Você está autenticado como Administrador. Clique para bloquear.' : 'Modo Visitante (Apenas Leitura). Clique para desbloquear com PIN.'}
-          className={`hidden lg:flex min-h-[44px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all shadow-sm cursor-pointer ${
-            isAdmin
-              ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-300'
-              : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          {isAdmin ? (
-            <>
-              <Unlock className="w-4 h-4 text-emerald-400" />
-              <span>Admin 🔓</span>
-            </>
-          ) : (
-            <>
-              <Lock className="w-4 h-4 text-zinc-400" />
-              <span>Visitante 🔒</span>
-            </>
-          )}
-        </button>
+        ) : isAdmin ? (
+          <button
+            onClick={onLogoutAdmin}
+            title="Administrador autenticado. Clique para bloquear."
+            className="hidden lg:flex min-h-[40px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/30 hover:border-rose-500/40 bg-emerald-500/15 hover:bg-rose-500/15 text-emerald-300 hover:text-rose-300 text-xs sm:text-sm font-semibold transition-all shadow-sm cursor-pointer group"
+          >
+            <Lock className="w-4 h-4 text-emerald-400 group-hover:text-rose-400" />
+            <span className="group-hover:hidden">Admin 🔓</span>
+            <span className="hidden group-hover:inline">🔒 Bloquear</span>
+          </button>
+        ) : null}
 
         <button
           onClick={onOpenSettings}
-          className="hidden lg:flex min-h-[44px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
+          title="Configurar Regras Financeiras"
+          className="hidden lg:flex min-h-[40px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
         >
           <Settings2 className="w-4 h-4 text-zinc-400" />
           <span>Regras</span>
