@@ -214,15 +214,43 @@ export function HeroBentoGrid({
                 </div>
               </div>
             )}
+
+            {/* Quick Budget Health Breakdown */}
+            <div className="mt-3 p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 grid grid-cols-2 gap-2 text-xs font-mono">
+              <div>
+                <span className="text-[10px] text-zinc-400 block uppercase tracking-wider font-sans">Teto Mensal</span>
+                <span className="font-bold text-zinc-100 privacy-sensitive">
+                  R$ {summary.cardHardCap.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-zinc-400 block uppercase tracking-wider font-sans">Total Gasto</span>
+                <span className="font-bold text-amber-400 privacy-sensitive">
+                  R$ {totalCapUsed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-zinc-400 block uppercase tracking-wider font-sans">Fatura Cartão</span>
+                <span className="font-bold text-blue-400 privacy-sensitive">
+                  R$ {summary.currentInvoiceTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-zinc-400 block uppercase tracking-wider font-sans">Pix Caixinha</span>
+                <span className="font-bold text-cyan-400 privacy-sensitive">
+                  R$ {(summary.pixCaixinhaUsedInCycle || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Footer info inside Card 1 */}
-        <div className="pt-4 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+        <div className="pt-3 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
           <span className="text-zinc-400">Saldo restante no teto:</span>
           <span
-            className={`font-mono font-bold text-sm privacy-sensitive ${
-              summary.remainingBudget < 0 ? 'text-rose-400' : 'text-zinc-100'
+            className={`font-mono font-bold text-sm sm:text-base privacy-sensitive ${
+              summary.remainingBudget < 0 ? 'text-rose-400' : 'text-emerald-400'
             }`}
           >
             R${' '}
@@ -417,10 +445,15 @@ export function HeroBentoGrid({
 
         {/* Active fixed commitments & subscriptions list with status and Pay from Caixinha action */}
         <div className="pt-3 mt-3 border-t border-zinc-800/80 space-y-2">
-          <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
-            Compromissos do Ciclo:
-          </span>
-          <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+              Compromissos do Ciclo ({summary.activeFixedCommitments.length + (summary.activeSubscriptions?.length || 0)}):
+            </span>
+            {(summary.activeFixedCommitments.length + (summary.activeSubscriptions?.length || 0)) > 3 && (
+              <span className="text-[10px] font-mono text-zinc-500">role para ver ↓</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5 max-h-52 overflow-y-auto pr-1">
             {[...summary.activeFixedCommitments, ...(summary.activeSubscriptions || [])].map((c) => {
               const isSubscription = c.commitmentType === 'SUBSCRIPTION';
               const isCharged = c.isCharged || c.badge === 'Cobrado';
