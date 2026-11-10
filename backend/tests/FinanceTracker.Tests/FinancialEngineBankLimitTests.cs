@@ -277,4 +277,57 @@ public class FinancialEngineBankLimitTests
         Assert.Equal(1170.00m, summary.AvailableBankCreditLimit); // NOT 1140!
         Assert.Equal(1170.00m, summary.RemainingBudget); // NOT 1140!
     }
+
+    [Fact]
+    public async Task GetDashboardSummaryAsync_PixCaixinha_DeductsFromRemainingCapAndBurnRate_WithoutAffectingInvoiceOrBankLimit()
+    {
+        var uow = new FakeUnitOfWork();
+        var cardRepo = (FakeCardExpenseRepo)uow.CardExpense;
+
+        // Hard Cap = 2200 - 1000 = 1200.00
+        // CreditCardLimit = 1200.00
+
+        // 1 CARD expense of 200.00 in 2026-12
+        cardRepo.Expenses.Add(new CardExpenseEntity
+        {
+            Id = 1,
+            BillingCycle = "2026-12",
+            Amount = 200.00m,
+            PaymentMethod = "CARD",
+            DeductFromCycleCap = true
+        });
+
+        // 1 PIX_CAIXINHA expense of 150.00 in 2026-12 with DeductFromCycleCap = true
+        cardRepo.Expenses.Add(new CardExpenseEntity
+        {
+            Id = 2,
+            BillingCycle = "2026-12",
+            Amount = 150.00m,
+            PaymentMethod = "PIX_CAIXINHA",
+            DeductFromCycleCap = true
+        });
+
+        var service = new FinancialEngineService(uow, NullLogger<FinancialEngineService>.Instance);
+        var refDate = new DateTime(2026, 11, 18);
+
+        var summary = (await service.GetDashboardSummaryAsync("2026-12", refDate)).Value!;
+
+        // 1. Credit Card Invoice Total ONLY counts CARD expenses (200.00, NOT 350.00)
+        Assert.Equal(200.00m, summary.CurrentInvoiceTotal);
+
+        // 2. Pix Caixinha used is recorded separately
+        Assert.Equal(150.00m, summary.PixCaixinhaUsedInCycle);
+
+        // 3. Bank credit limit ONLY deducted by CARD expenses (1200 - 200 = 1000.00, NOT 850.00)
+        Assert.Equal(1000.00m, summary.AvailableBankCreditLimit);
+        Assert.Equal(200.00m, summary.TotalUnpaidCardUsage);
+
+        // 4. RemainingCap (Monthly Budget) MUST be deducted by BOTH Card + Pix Caixinha:
+        // Cap = 1200.00 - 200.00 (Card) - 150.00 (Pix Caixinha) = 850.00
+        Assert.Equal(850.00m, summary.RemainingBudget);
+
+        // 5. Daily Burn Rate reflects the reduced RemainingCap (850 / daysUntilClosing)
+        Assert.True(summary.AvailablePerDay > 0);
+        Assert.Equal(Math.Round(850.00m / summary.DaysUntilClosing, 2), summary.AvailablePerDay);
+    }
 }

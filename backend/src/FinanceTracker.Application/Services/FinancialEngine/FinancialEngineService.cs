@@ -174,7 +174,7 @@ public class FinancialEngineService : IFinancialEngineService
             var daysElapsed = Math.Clamp((now.Date - cycleStartDate.Date).Days, 0, totalDaysInCycle);
             var idealDailyBudget = totalDaysInCycle > 0 ? (cardHardCap / totalDaysInCycle) : 0m;
             var idealPaceAmount = Math.Round(idealDailyBudget * daysElapsed, 2);
-            var paceDiff = currentInvoiceTotal - idealPaceAmount;
+            var paceDiff = totalSpentInCycle - idealPaceAmount;
             var paceStatus = paceDiff < -50m ? "AHEAD" : (paceDiff > 50m ? "OVERPACED" : "ON_TRACK");
             var idealBurnPacePercent = (decimal)daysElapsed / totalDaysInCycle * 100.0m;
             var burnPacePercent = cardHardCap > 0 ? (totalSpentInCycle / cardHardCap) * 100.0m : 0m;

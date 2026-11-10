@@ -52,7 +52,7 @@ public class IosIntegrationService : IIosIntegrationService
         ITelegramService telegramService,
         IValidator<IosShortcutWebhookModel> validator,
         ILogger<IosIntegrationService> logger)
-        : this(expenseService, financialEngineService, groqService, telegramService, new ConfigurationBuilder().Build(), validator, logger)
+        : this(expenseService, financialEngineService, groqService, telegramService, (IConfiguration?)null, validator, logger)
     {
     }
 
@@ -171,8 +171,6 @@ public class IosIntegrationService : IIosIntegrationService
             category = SanitizeCategory(category);
 
             // 4. Persist in Neon PostgreSQL & Recalculate Cycle Metrics
-            var isPixCaixinha = string.Equals(paymentMethod, "PIX_CAIXINHA", StringComparison.OrdinalIgnoreCase);
-
             var createExpenseModel = new CreateExpenseModel
             {
                 Description = description,
@@ -181,7 +179,7 @@ public class IosIntegrationService : IIosIntegrationService
                 Category = category,
                 Installments = installments,
                 PaymentMethod = paymentMethod,
-                DeductFromCycleCap = !isPixCaixinha,
+                DeductFromCycleCap = model.DeductFromCycleCap ?? true,
                 TransactionDate = transactionDate ?? DateTime.Now
             };
 
@@ -221,7 +219,7 @@ public class IosIntegrationService : IIosIntegrationService
 
             try
             {
-                var chatIdStr = _configuration["Telegram:AllowedChatId"]
+                var chatIdStr = _configuration?["Telegram:AllowedChatId"]
                     ?? Environment.GetEnvironmentVariable("TELEGRAM__ALLOWEDCHATID")
                     ?? Environment.GetEnvironmentVariable("Telegram__AllowedChatId")
                     ?? Environment.GetEnvironmentVariable("TELEGRAM_ALLOWED_CHAT_ID");

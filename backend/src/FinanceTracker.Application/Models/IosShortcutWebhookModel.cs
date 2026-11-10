@@ -8,4 +8,5 @@ public class IosShortcutWebhookModel
     public string? RawText { get; set; }
     public string? PaymentMethod { get; set; }
     public int? Installments { get; set; }
+    public bool? DeductFromCycleCap { get; set; }
 }

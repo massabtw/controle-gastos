@@ -267,7 +267,7 @@ public class IosIntegrationServiceTests
     }
 
     [Fact]
-    public async Task ProcessShortcutWebhookAsync_RawOcrNubankPixDetailedScreenDump_ShouldParseAmountAndRecipientAndNotDeductFromCap()
+    public async Task ProcessShortcutWebhookAsync_RawOcrNubankPixDetailedScreenDump_ShouldParseAmountAndRecipientAndDeductFromCap()
     {
         Environment.SetEnvironmentVariable("APP_PIN", null);
         var expenseService = new FakeExpenseService();
@@ -303,9 +303,9 @@ public class IosIntegrationServiceTests
         // 2. Description should be Gustavo Antonio A Rodrigues
         Assert.Equal("Gustavo Antonio A Rodrigues", expenseService.LastCreatedModel.Description);
 
-        // 3. PIX_CAIXINHA should not deduct from cycle cap
+        // 3. PIX_CAIXINHA should deduct from monthly spending cap by default
         Assert.Equal("PIX_CAIXINHA", expenseService.LastCreatedModel.PaymentMethod);
-        Assert.False(expenseService.LastCreatedModel.DeductFromCycleCap);
+        Assert.True(expenseService.LastCreatedModel.DeductFromCycleCap);
 
         // 4. Proactive Telegram push must be delivered
         Assert.NotNull(telegram.LastMessage);

@@ -137,6 +137,8 @@ public class DatabaseMigrator
             ALTER TABLE InvoicePayments ADD COLUMN IF NOT EXISTS SurplusAmount NUMERIC(12,2) NOT NULL DEFAULT 0.00;
             ALTER TABLE InvoicePayments ADD COLUMN IF NOT EXISTS SurplusInvested BOOLEAN NOT NULL DEFAULT FALSE;
             ALTER TABLE InvoicePayments ADD COLUMN IF NOT EXISTS Notes TEXT NULL;
+
+            UPDATE CardExpenses SET DeductFromCycleCap = TRUE WHERE PaymentMethod = 'PIX_CAIXINHA' AND DeductFromCycleCap = FALSE;
         ";
         await conn.ExecuteAsync(pgColumnMigrations);
 
@@ -205,7 +207,8 @@ public class DatabaseMigrator
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicePayments') AND name = 'CreatedAt') ALTER TABLE dbo.InvoicePayments ADD CreatedAt DATETIMEOFFSET(7) NULL DEFAULT (SYSDATETIMEOFFSET());",
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicePayments') AND name = 'UpdatedAt') ALTER TABLE dbo.InvoicePayments ADD UpdatedAt DATETIMEOFFSET(7) NULL DEFAULT (SYSDATETIMEOFFSET());",
             "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.InvoicePayments') AND name = 'Deleted') ALTER TABLE dbo.InvoicePayments ADD Deleted BIT NULL DEFAULT 0;",
-            "EXEC('UPDATE dbo.InvoicePayments SET Deleted = 0 WHERE Deleted IS NULL;');"
+            "EXEC('UPDATE dbo.InvoicePayments SET Deleted = 0 WHERE Deleted IS NULL;');",
+            "UPDATE dbo.CardExpenses SET DeductFromCycleCap = 1 WHERE PaymentMethod = 'PIX_CAIXINHA' AND DeductFromCycleCap = 0;"
         };
 
         foreach (var stmt in statements)
