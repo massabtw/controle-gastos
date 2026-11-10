@@ -32,6 +32,10 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'expenses' | 'subscriptions' | 'projections'>('expenses');
 
+  // Admin security & Privacy Mode
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isPrivacyBlur, setIsPrivacyBlur] = useState(true);
+
   // Modals state
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<CardExpense | null>(null);
@@ -46,6 +50,36 @@ export default function Home() {
   const [isNewSubscriptionOpen, setIsNewSubscriptionOpen] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isServerWakingUp, setIsServerWakingUp] = useState(false);
+
+  // Check initial admin token on mount
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const token = api.getAdminToken();
+      if (!token) {
+        setIsAdmin(false);
+        setIsPrivacyBlur(true);
+        return;
+      }
+
+      try {
+        const res = await api.verifyAdmin(token);
+        if (res && res.valid) {
+          setIsAdmin(true);
+          setIsPrivacyBlur(false);
+        } else {
+          api.clearAdminToken();
+          setIsAdmin(false);
+          setIsPrivacyBlur(true);
+        }
+      } catch {
+        // If server is cold or token invalid, default to guest
+        setIsAdmin(false);
+        setIsPrivacyBlur(true);
+      }
+    };
+
+    checkAdmin();
+  }, []);
 
   useEffect(() => {
     const handleWakingUp = (e: Event) => {
@@ -64,6 +98,22 @@ export default function Home() {
       window.removeEventListener('finance_app_pin_required', handlePinRequired);
     };
   }, []);
+
+  const guardAdminAction = (action: () => void) => {
+    if (!isAdmin) {
+      setIsPinModalOpen(true);
+      return;
+    }
+    action();
+  };
+
+  const handleLogoutAdmin = () => {
+    if (confirm('Deseja bloquear o painel e voltar ao modo Visitante (Apenas Leitura)?')) {
+      api.clearAdminToken();
+      setIsAdmin(false);
+      setIsPrivacyBlur(true);
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -98,7 +148,10 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
+    <div
+      data-privacy={isPrivacyBlur ? 'true' : 'false'}
+      className="min-h-screen w-full overflow-x-hidden bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300"
+    >
       {/* Background ambient lighting */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-emerald-600/5 blur-[120px] rounded-full" />
@@ -110,12 +163,16 @@ export default function Home() {
           summary={summary}
           selectedCycle={selectedCycle || summary?.billingCycle || '...'}
           onCycleChange={handleCycleChange}
-          onOpenNewExpense={() => setIsNewExpenseOpen(true)}
-          onOpenPixCaixinha={() => setIsPixCaixinhaOpen(true)}
-          onOpenReceivePix={() => setIsReceivePixOpen(true)}
-          onOpenSyncInvoice={() => setIsSyncInvoiceOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenNewExpense={() => guardAdminAction(() => setIsNewExpenseOpen(true))}
+          onOpenPixCaixinha={() => guardAdminAction(() => setIsPixCaixinhaOpen(true))}
+          onOpenReceivePix={() => guardAdminAction(() => setIsReceivePixOpen(true))}
+          onOpenSyncInvoice={() => guardAdminAction(() => setIsSyncInvoiceOpen(true))}
+          onOpenSettings={() => guardAdminAction(() => setIsSettingsOpen(true))}
           onOpenPinModal={() => setIsPinModalOpen(true)}
+          isAdmin={isAdmin}
+          isPrivacyBlur={isPrivacyBlur}
+          onTogglePrivacy={() => setIsPrivacyBlur((prev) => !prev)}
+          onLogoutAdmin={handleLogoutAdmin}
         />
 
         {/* Cloud Server Wake-up Notice (Render Free Tier Cold Start) */}
@@ -134,10 +191,15 @@ export default function Home() {
         {/* Core Hero Bento Grid */}
         <HeroBentoGrid
           summary={summary}
-          onOpenUpdateCaixinha={() => setIsUpdateCaixinhaOpen(true)}
-          onOpenDepositCaixinha={() => setIsDepositCaixinhaOpen(true)}
-          onOpenReceivePix={() => setIsReceivePixOpen(true)}
-          onOpenEditCardLimit={() => setIsEditCardLimitOpen(true)}
+          onOpenUpdateCaixinha={() => guardAdminAction(() => setIsUpdateCaixinhaOpen(true))}
+          onOpenDepositCaixinha={() => guardAdminAction(() => setIsDepositCaixinhaOpen(true))}
+          onOpenReceivePix={() => guardAdminAction(() => setIsReceivePixOpen(true))}
+          onOpenEditCardLimit={() => guardAdminAction(() => setIsEditCardLimitOpen(true))}
+          onCommitmentPaid={loadData}
+          onInvoiceStatusChanged={loadData}
+          isAdmin={isAdmin}
+          onRequireAdmin={() => setIsPinModalOpen(true)}
+        />
           onCommitmentPaid={loadData}
           onInvoiceStatusChanged={loadData}
         />
@@ -199,17 +261,19 @@ export default function Home() {
             categories={summary?.categoryBreakdown || []}
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
-            onEditExpense={(exp) => setEditingExpense(exp)}
-            onDeleteExpense={(exp) => setDeletingExpense(exp)}
-            onOpenNewExpense={() => setIsNewExpenseOpen(true)}
+            onEditExpense={(exp) => guardAdminAction(() => setEditingExpense(exp))}
+            onDeleteExpense={(exp) => guardAdminAction(() => setDeletingExpense(exp))}
+            onOpenNewExpense={() => guardAdminAction(() => setIsNewExpenseOpen(true))}
           />
         )}
 
         {mainTab === 'subscriptions' && (
           <SubscriptionsTab
             summary={summary}
-            onOpenNewSubscription={() => setIsNewSubscriptionOpen(true)}
+            onOpenNewSubscription={() => guardAdminAction(() => setIsNewSubscriptionOpen(true))}
             onUpdate={loadData}
+            isAdmin={isAdmin}
+            onRequireAdmin={() => setIsPinModalOpen(true)}
           />
         )}
 
@@ -306,7 +370,16 @@ export default function Home() {
       <PinModal
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}
-        onSuccess={loadData}
+        onSuccess={(token) => {
+          if (token) {
+            setIsAdmin(true);
+            setIsPrivacyBlur(false);
+          } else {
+            setIsAdmin(false);
+            setIsPrivacyBlur(true);
+          }
+          loadData();
+        }}
       />
     </div>
   );

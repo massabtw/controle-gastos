@@ -13,6 +13,8 @@ interface HeroBentoGridProps {
   onOpenEditCardLimit?: () => void;
   onCommitmentPaid?: () => void;
   onInvoiceStatusChanged?: () => void;
+  isAdmin?: boolean;
+  onRequireAdmin?: () => void;
 }
 
 export function HeroBentoGrid({
@@ -23,6 +25,8 @@ export function HeroBentoGrid({
   onOpenEditCardLimit,
   onCommitmentPaid,
   onInvoiceStatusChanged,
+  isAdmin = false,
+  onRequireAdmin,
 }: HeroBentoGridProps) {
   const [payingId, setPayingId] = useState<number | null>(null);
   const [togglingInvoice, setTogglingInvoice] = useState(false);
@@ -31,6 +35,10 @@ export function HeroBentoGrid({
   if (!summary) return null;
 
   const handleToggleInvoicePaid = async () => {
+    if (!isAdmin) {
+      onRequireAdmin?.();
+      return;
+    }
     setTogglingInvoice(true);
     try {
       await api.toggleInvoicePaid(summary.billingCycle);
@@ -44,6 +52,10 @@ export function HeroBentoGrid({
   };
 
   const handleQuickDeposit = async (amount: number) => {
+    if (!isAdmin) {
+      onRequireAdmin?.();
+      return;
+    }
     setQuickDepositing(amount);
     try {
       await api.depositCaixinha(amount);
@@ -57,6 +69,10 @@ export function HeroBentoGrid({
   };
 
   const handleToggleCommitmentPaid = async (commitmentId: number) => {
+    if (!isAdmin) {
+      onRequireAdmin?.();
+      return;
+    }
     setPayingId(commitmentId);
     try {
       await api.toggleCommitmentPaid(commitmentId, summary.billingCycle);
@@ -148,7 +164,7 @@ export function HeroBentoGrid({
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-xs sm:text-sm text-zinc-400 font-medium">R$</span>
               <span
-                className={`text-3xl sm:text-5xl font-black tracking-tight font-mono ${
+                className={`text-3xl sm:text-5xl font-black tracking-tight font-mono privacy-sensitive ${
                   isCritical ? 'text-rose-400' : isWarning ? 'text-amber-400' : 'text-emerald-400'
                 }`}
               >
@@ -205,7 +221,7 @@ export function HeroBentoGrid({
         <div className="pt-4 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs">
           <span className="text-zinc-400">Saldo restante no teto:</span>
           <span
-            className={`font-mono font-bold text-sm ${
+            className={`font-mono font-bold text-sm privacy-sensitive ${
               summary.remainingBudget < 0 ? 'text-rose-400' : 'text-zinc-100'
             }`}
           >
@@ -246,7 +262,7 @@ export function HeroBentoGrid({
             <div className="flex items-center gap-2 shrink-0">
               {onOpenEditCardLimit && (
                 <button
-                  onClick={onOpenEditCardLimit}
+                  onClick={isAdmin ? onOpenEditCardLimit : onRequireAdmin}
                   className="min-h-[44px] flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-3 py-1.5 rounded-xl transition-colors cursor-pointer"
                   title="Ajustar Limite Bancário ou Teto Mensal"
                 >
@@ -262,14 +278,14 @@ export function HeroBentoGrid({
 
           <div className="my-2">
             <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
-              <span className="text-2xl sm:text-3xl font-bold font-mono text-zinc-100 whitespace-nowrap">
+              <span className="text-2xl sm:text-3xl font-bold font-mono text-zinc-100 whitespace-nowrap privacy-sensitive">
                 R${' '}
                 {totalCapUsed.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </span>
-              <span className="text-xs font-mono text-zinc-400 whitespace-nowrap">
+              <span className="text-xs font-mono text-zinc-400 whitespace-nowrap privacy-sensitive">
                 de R${' '}
                 {summary.cardHardCap.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
@@ -306,7 +322,7 @@ export function HeroBentoGrid({
             {/* Bank Credit Limit Indicator */}
             <div className="mt-2.5 p-2 rounded-xl bg-zinc-950/60 border border-zinc-800 text-[11px] font-mono flex items-center justify-between">
               <span className="text-zinc-400">Limite Banco Livre:</span>
-              <span className="font-bold text-emerald-400">
+              <span className="font-bold text-emerald-400 privacy-sensitive">
                 R$ {summary.availableBankCreditLimit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 <span className="text-zinc-500 font-normal"> / R$ {summary.creditCardLimit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </span>
@@ -320,14 +336,14 @@ export function HeroBentoGrid({
                     <RefreshCw className="w-3 h-3 text-purple-400" />
                     Assinaturas no Cartão:
                   </span>
-                  <span className="font-bold">
+                  <span className="font-bold privacy-sensitive">
                     R$ {summary.cardSubscriptionsTotal.toFixed(2)} / mês
                   </span>
                 </div>
                 {(summary.scheduledSubscriptionsTotal ?? 0) > 0 && (
                   <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-purple-500/20 font-mono">
-                    <span className="text-emerald-400">Cobrado: R$ {(summary.chargedSubscriptionsTotal ?? 0).toFixed(2)}</span>
-                    <span className="text-purple-300">Agendado: R$ {(summary.scheduledSubscriptionsTotal ?? 0).toFixed(2)}</span>
+                    <span className="text-emerald-400 privacy-sensitive">Cobrado: R$ {(summary.chargedSubscriptionsTotal ?? 0).toFixed(2)}</span>
+                    <span className="text-purple-300 privacy-sensitive">Agendado: R$ {(summary.scheduledSubscriptionsTotal ?? 0).toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -352,7 +368,7 @@ export function HeroBentoGrid({
                 </div>
                 <div className="flex items-center justify-between text-zinc-300 text-[11px]">
                   <span>Fatura Quitada:</span>
-                  <span className="font-bold text-zinc-100 font-mono">
+                  <span className="font-bold text-zinc-100 font-mono privacy-sensitive">
                     R$ {summary.invoicePaidAmount.toFixed(2)}
                   </span>
                 </div>
@@ -419,7 +435,7 @@ export function HeroBentoGrid({
                       <RefreshCw className="w-3 h-3 text-purple-400 shrink-0" />
                     )}
                     <span className="text-zinc-300 font-medium truncate">{c.title}:</span>
-                    <span className="font-mono font-bold text-zinc-100 whitespace-nowrap">
+                    <span className="font-mono font-bold text-zinc-100 whitespace-nowrap privacy-sensitive">
                       R$ {c.amount.toFixed(0)}
                     </span>
                     {isSubscription ? (
@@ -504,7 +520,7 @@ export function HeroBentoGrid({
               <span>Saldo Investido:</span>
               {onOpenUpdateCaixinha && (
                 <button
-                  onClick={onOpenUpdateCaixinha}
+                  onClick={isAdmin ? onOpenUpdateCaixinha : onRequireAdmin}
                   className="min-h-[36px] px-2 flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 hover:underline cursor-pointer"
                   title="Editar Saldo Total Manualmente"
                 >
@@ -515,7 +531,7 @@ export function HeroBentoGrid({
             </div>
             <div className="flex items-baseline gap-1 text-purple-300 font-mono">
               <span className="text-xs">R$</span>
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <span className="text-2xl sm:text-3xl font-bold tracking-tight privacy-sensitive">
                 {summary.nubankCaixinhaBalance.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -523,8 +539,8 @@ export function HeroBentoGrid({
               </span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-zinc-400 font-mono mt-1.5 pt-1.5 border-t border-zinc-800/60">
-              <span>Rende: +R$ {summary.nubankCaixinhaMonthlyYield.toFixed(2)}/mês</span>
-              <span className="text-emerald-400 font-medium">(+R$ {summary.nubankCaixinhaDailyYield.toFixed(2)}/dia)</span>
+              <span className="privacy-sensitive">Rende: +R$ {summary.nubankCaixinhaMonthlyYield.toFixed(2)}/mês</span>
+              <span className="text-emerald-400 font-medium privacy-sensitive">(+R$ {summary.nubankCaixinhaDailyYield.toFixed(2)}/dia)</span>
             </div>
 
             {/* Quick Add Chips */}
@@ -533,7 +549,7 @@ export function HeroBentoGrid({
                 <span>+ Adicionar na Caixinha:</span>
                 {onOpenDepositCaixinha && (
                   <button
-                    onClick={onOpenDepositCaixinha}
+                    onClick={isAdmin ? onOpenDepositCaixinha : onRequireAdmin}
                     className="text-purple-400 hover:text-purple-300 hover:underline text-xs cursor-pointer py-1"
                   >
                     Outro valor...
@@ -559,7 +575,7 @@ export function HeroBentoGrid({
             <div className="mt-2.5 grid grid-cols-2 gap-2">
               {onOpenReceivePix && (
                 <button
-                  onClick={onOpenReceivePix}
+                  onClick={isAdmin ? onOpenReceivePix : onRequireAdmin}
                   className="min-h-[44px] flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-all cursor-pointer shadow-sm whitespace-nowrap"
                   title="Registrar dinheiro recebido externamente via Pix que vai para a Caixinha"
                 >
@@ -570,7 +586,7 @@ export function HeroBentoGrid({
 
               {onOpenDepositCaixinha && (
                 <button
-                  onClick={onOpenDepositCaixinha}
+                  onClick={isAdmin ? onOpenDepositCaixinha : onRequireAdmin}
                   className="min-h-[44px] flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-200 text-xs font-semibold transition-all cursor-pointer shadow-sm whitespace-nowrap"
                   title="Guardar valor personalizado na Caixinha"
                 >
@@ -588,7 +604,7 @@ export function HeroBentoGrid({
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                 Lucro Fantasma Fatura:
               </span>
-              <span className="font-mono text-xs font-bold text-emerald-400">
+              <span className="font-mono text-xs font-bold text-emerald-400 privacy-sensitive">
                 +R$ {summary.phantomYieldEstimate.toFixed(2)}
               </span>
             </div>

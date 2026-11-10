@@ -158,12 +158,13 @@ export interface FixedCommitment {
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
-  // Attach PIN if stored in localStorage
-  const pinHeader: Record<string, string> = {};
+  // Attach Admin Token / PIN if stored in localStorage
+  const authHeaders: Record<string, string> = {};
   if (typeof window !== 'undefined') {
-    const savedPin = localStorage.getItem('finance_app_pin');
-    if (savedPin) {
-      pinHeader['X-App-Pin'] = savedPin;
+    const adminToken = localStorage.getItem('admin_token') || localStorage.getItem('finance_app_pin');
+    if (adminToken) {
+      authHeaders['X-Admin-Token'] = adminToken;
+      authHeaders['X-App-Pin'] = adminToken;
     }
   }
 
@@ -180,7 +181,7 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...pinHeader,
+        ...authHeaders,
         ...options?.headers,
       },
       cache: 'no-store',
@@ -195,7 +196,7 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('finance_app_pin_required'));
       }
-      throw new Error('Acesso negado: PIN inválido ou não configurado.');
+      throw new Error('Acesso de administrador necessário. Autentique-se com o PIN.');
     }
 
     if (!res.ok) {
@@ -382,4 +383,44 @@ export const api = {
     request<{ message: string }>(`/api/profile/commitments/${id}`, {
       method: 'DELETE',
     }),
+
+  // Admin Auth
+  loginAdmin: (password: string) =>
+    request<{ success: boolean; token: string; expiresInDays: number; message: string }>(`/api/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+
+  verifyAdmin: (token?: string) => {
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['X-Admin-Token'] = token;
+      headers['X-App-Pin'] = token;
+    }
+    return request<{ valid: boolean; message: string }>(`/api/auth/verify`, {
+      headers,
+    });
+  },
+
+  getAdminToken: (): string | null => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('admin_token') || localStorage.getItem('finance_app_pin');
+  },
+
+  setAdminToken: (token: string) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('admin_token', token.trim());
+    localStorage.setItem('finance_app_pin', token.trim());
+  },
+
+  clearAdminToken: () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('finance_app_pin');
+  },
+
+  hasAdminToken: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(localStorage.getItem('admin_token') || localStorage.getItem('finance_app_pin'));
+  },
 };

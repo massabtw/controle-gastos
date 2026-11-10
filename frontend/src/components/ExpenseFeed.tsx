@@ -251,7 +251,7 @@ export function ExpenseFeed({
 
                   <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                     <div className="text-right whitespace-nowrap">
-                      <span className={`font-mono font-bold text-sm sm:text-base block ${isPixInflow ? 'text-emerald-400' : 'text-zinc-100'}`}>
+                      <span className={`font-mono font-bold text-sm sm:text-base block privacy-sensitive ${isPixInflow ? 'text-emerald-400' : 'text-zinc-100'}`}>
                         {isPixInflow ? '+ ' : ''}R${' '}
                         {expense.amount.toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,
@@ -259,7 +259,7 @@ export function ExpenseFeed({
                         })}
                       </span>
                       {isInstallment && (
-                        <span className="block text-[10px] font-mono text-zinc-500">
+                        <span className="block text-[10px] font-mono text-zinc-500 privacy-sensitive">
                           Total: R$ {(expense.amount * expense.installmentTotal).toFixed(0)}
                         </span>
                       )}

@@ -18,12 +18,16 @@ interface SubscriptionsTabProps {
   summary: DashboardSummary | null;
   onOpenNewSubscription: () => void;
   onUpdate: () => void;
+  isAdmin?: boolean;
+  onRequireAdmin?: () => void;
 }
 
 export function SubscriptionsTab({
   summary,
   onOpenNewSubscription,
   onUpdate,
+  isAdmin = false,
+  onRequireAdmin,
 }: SubscriptionsTabProps) {
   const [subscriptions, setSubscriptions] = useState<FixedCommitment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -48,6 +52,10 @@ export function SubscriptionsTab({
   }, []);
 
   const handleToggleActive = async (sub: FixedCommitment) => {
+    if (!isAdmin) {
+      onRequireAdmin?.();
+      return;
+    }
     setTogglingId(sub.id);
     try {
       await api.updateCommitment(sub.id, {
@@ -65,6 +73,10 @@ export function SubscriptionsTab({
   };
 
   const handleDelete = async (id: number, title: string) => {
+    if (!isAdmin) {
+      onRequireAdmin?.();
+      return;
+    }
     if (!confirm(`Deseja realmente remover a assinatura "${title}"?`)) return;
 
     try {
@@ -103,7 +115,7 @@ export function SubscriptionsTab({
               <RefreshCw className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-zinc-100">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-zinc-100 privacy-sensitive">
             R${' '}
             {totalSubsMonthly.toLocaleString('pt-BR', {
               minimumFractionDigits: 2,
@@ -262,7 +274,7 @@ export function SubscriptionsTab({
                   {/* Right Actions */}
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="text-right whitespace-nowrap">
-                      <span className="text-sm sm:text-base font-black font-mono text-zinc-100 block">
+                      <span className="text-sm sm:text-base font-black font-mono text-zinc-100 block privacy-sensitive">
                         R${' '}
                         {sub.amount.toLocaleString('pt-BR', {
                           minimumFractionDigits: 2,

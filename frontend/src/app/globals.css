@@ -47,3 +47,17 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f46;
 }
+
+/* Privacy Blur for Sensitive Financial Figures */
+[data-privacy="true"] .privacy-sensitive,
+.privacy-blur {
+  filter: blur(7px);
+  user-select: none;
+  transition: filter 0.2s ease-in-out;
+}
+
+/* Allow hovering to temporarily unblur if desired */
+[data-privacy="true"] .privacy-sensitive:hover {
+  filter: blur(0px);
+}
+

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, Plus, Settings2, Flame, ShieldCheck, CreditCard, Send, ArrowDownLeft, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 import { DashboardSummary } from '@/lib/api';
 
 interface HeaderProps {
@@ -14,6 +14,11 @@ interface HeaderProps {
   onOpenSyncInvoice?: () => void;
   onOpenSettings: () => void;
   onOpenPinModal?: () => void;
+  isAdmin?: boolean;
+  isPrivacyBlur?: boolean;
+  onTogglePrivacy?: () => void;
+  onToggleAdmin?: () => void;
+  onLogoutAdmin?: () => void;
 }
 
 export function Header({
@@ -26,6 +31,11 @@ export function Header({
   onOpenSyncInvoice,
   onOpenSettings,
   onOpenPinModal,
+  isAdmin = false,
+  isPrivacyBlur = false,
+  onTogglePrivacy,
+  onToggleAdmin,
+  onLogoutAdmin,
 }: HeaderProps) {
   // Helper to step cycles
   const handlePrevCycle = () => {
@@ -68,24 +78,42 @@ export function Header({
           </div>
         </div>
 
-        {/* Mobile quick utility buttons (PIN & Regras) */}
+        {/* Mobile quick utility buttons: Eye Toggle, Admin/Visitante Badge, Regras */}
         <div className="flex lg:hidden items-center gap-1.5 shrink-0">
-          {onOpenPinModal && (
+          {onTogglePrivacy && (
             <button
-              onClick={onOpenPinModal}
-              title="Configurar PIN de Segurança"
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors shadow-sm cursor-pointer"
+              onClick={onTogglePrivacy}
+              title={isPrivacyBlur ? 'Exibir valores reais' : 'Ocultar valores (Modo Privacidade)'}
+              className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border transition-colors shadow-sm cursor-pointer ${
+                isPrivacyBlur
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+              }`}
             >
-              <Lock className="w-4 h-4" />
+              {isPrivacyBlur ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-zinc-400" />}
             </button>
           )}
+
+          <button
+            onClick={isAdmin ? onLogoutAdmin : onOpenPinModal}
+            title={isAdmin ? 'Você está como Administrador. Clique para bloquear.' : 'Modo Visitante (Apenas Leitura). Clique para desbloquear.'}
+            className={`min-h-[44px] px-2.5 flex items-center gap-1 rounded-xl border text-[11px] font-semibold transition-all shadow-sm cursor-pointer ${
+              isAdmin
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {isAdmin ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-zinc-400" />}
+            <span>{isAdmin ? 'Admin' : 'Visitante'}</span>
+          </button>
+
           <button
             onClick={onOpenSettings}
             title="Configurar Regras Financeiras"
-            className="min-h-[44px] px-3 flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-colors shadow-sm cursor-pointer"
+            className="min-h-[44px] px-2.5 flex items-center gap-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium transition-colors shadow-sm cursor-pointer"
           >
             <Settings2 className="w-4 h-4 text-zinc-400" />
-            <span>Regras</span>
+            <span className="hidden sm:inline">Regras</span>
           </button>
         </div>
       </div>
@@ -195,16 +223,42 @@ export function Header({
           </button>
         )}
 
-        {onOpenPinModal && (
+        {onTogglePrivacy && (
           <button
-            onClick={onOpenPinModal}
-            title="Configurar PIN de Segurança"
-            className="hidden lg:flex min-h-[44px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer"
+            onClick={onTogglePrivacy}
+            title={isPrivacyBlur ? 'Exibir valores reais' : 'Ocultar valores (Modo Privacidade)'}
+            className={`hidden lg:flex min-h-[44px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-2 rounded-xl border text-xs sm:text-sm font-medium transition-colors shadow-sm cursor-pointer ${
+              isPrivacyBlur
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+            }`}
           >
-            <Lock className="w-4 h-4 text-zinc-400" />
-            <span>PIN</span>
+            {isPrivacyBlur ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4 text-zinc-400" />}
+            <span>{isPrivacyBlur ? 'Oculto' : 'Visível'}</span>
           </button>
         )}
+
+        <button
+          onClick={isAdmin ? onLogoutAdmin : onOpenPinModal}
+          title={isAdmin ? 'Você está autenticado como Administrador. Clique para bloquear.' : 'Modo Visitante (Apenas Leitura). Clique para desbloquear com PIN.'}
+          className={`hidden lg:flex min-h-[44px] shrink-0 whitespace-nowrap items-center gap-1.5 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-all shadow-sm cursor-pointer ${
+            isAdmin
+              ? 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-300'
+              : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          {isAdmin ? (
+            <>
+              <Unlock className="w-4 h-4 text-emerald-400" />
+              <span>Admin 🔓</span>
+            </>
+          ) : (
+            <>
+              <Lock className="w-4 h-4 text-zinc-400" />
+              <span>Visitante 🔒</span>
+            </>
+          )}
+        </button>
 
         <button
           onClick={onOpenSettings}

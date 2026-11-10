@@ -2219,118 +2219,145 @@ export function ReceivePixModal({
   );
 }
 
-// 12. PIN PROTECTION MODAL
+// 12. PIN PROTECTION / ADMIN AUTH MODAL
 interface PinModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (token?: string) => void;
 }
 
 export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
-  const [pin, setPin] = useState('');
-  const [currentSavedPin, setCurrentSavedPin] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('finance_app_pin') || '';
-      setCurrentSavedPin(saved);
-      setPin(saved);
+    if (isOpen) {
+      setPassword('');
+      setErrorMessage(null);
+      setHasToken(api.hasAdminToken());
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (typeof window !== 'undefined') {
-      if (pin.trim()) {
-        localStorage.setItem('finance_app_pin', pin.trim());
-      } else {
-        localStorage.removeItem('finance_app_pin');
-      }
+    if (!password.trim()) {
+      setErrorMessage('Digite a senha ou PIN de administrador.');
+      return;
     }
-    if (onSuccess) onSuccess();
-    onClose();
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await api.loginAdmin(password.trim());
+      if (res && res.token) {
+        api.setAdminToken(res.token);
+        if (onSuccess) onSuccess(res.token);
+        onClose();
+      } else {
+        setErrorMessage('Senha incorreta. Tente novamente.');
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha na autenticação';
+      setErrorMessage(msg.includes('401') || msg.includes('incorreta') 
+        ? 'Senha ou PIN de administrador incorreto.' 
+        : msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemove = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('finance_app_pin');
-      setCurrentSavedPin('');
-      setPin('');
-    }
-    if (onSuccess) onSuccess();
+  const handleLogout = () => {
+    api.clearAdminToken();
+    setHasToken(false);
+    setPassword('');
+    if (onSuccess) onSuccess('');
     onClose();
   };
 
   return (
     <BottomSheetShell onClose={onClose} maxWidthClass="max-w-sm">
-        <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              🔒
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-zinc-100">PIN de Segurança</h2>
-              <p className="text-xs text-zinc-400">Proteja alterações na nuvem</p>
-            </div>
+      <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
+            🔒
           </div>
-          <button
-            onClick={onClose}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-zinc-800/50 hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div>
+            <h2 className="text-base font-semibold text-zinc-100">Modo Administrador</h2>
+            <p className="text-xs text-zinc-400">Desbloqueie para salvar alterações</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="min-h-[44px] min-w-[44px] rounded-xl bg-zinc-800/50 hover:bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <form onSubmit={handleLogin} className="mt-5 space-y-4">
+        <div>
+          <label className="block text-xs font-medium text-zinc-300 mb-1.5">
+            Digite a Senha ou PIN de Administrador:
+          </label>
+          <input
+            type="password"
+            autoFocus
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setErrorMessage(null);
+            }}
+            placeholder="Senha ou PIN"
+            className="w-full min-h-[48px] text-center tracking-widest text-lg font-mono px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-emerald-500"
+          />
+
+          {errorMessage && (
+            <p className="text-xs text-rose-400 mt-2 font-medium flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>{errorMessage}</span>
+            </p>
+          )}
+
+          <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">
+            O token fica salvo neste dispositivo por 90 dias. Em modo Visitante, você pode visualizar todos os dados com privacidade.
+          </p>
         </div>
 
-        <form onSubmit={handleSave} className="mt-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-              Digite o PIN de 4 a 6 dígitos:
-            </label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={8}
-              autoFocus
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              placeholder="Ex: 1234"
-              className="w-full min-h-[48px] text-center tracking-widest text-lg font-mono px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-blue-500"
-            />
-            <p className="text-[11px] text-zinc-500 mt-1">
-              Configurado via variável de ambiente <code className="text-zinc-400">APP_PIN</code> no servidor Render.
-            </p>
-          </div>
+        <div className="pt-2 flex items-center justify-between gap-2">
+          {hasToken ? (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 border border-rose-500/30 transition-colors cursor-pointer"
+            >
+              Bloquear (Sair)
+            </button>
+          ) : <span />}
 
-          <div className="pt-2 flex items-center justify-between gap-2">
-            {currentSavedPin ? (
-              <button
-                type="button"
-                onClick={handleRemove}
-                className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/20 cursor-pointer"
-              >
-                Remover PIN
-              </button>
-            ) : <span />}
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="min-h-[44px] px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="min-h-[44px] px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md cursor-pointer"
-              >
-                Salvar PIN
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              className="min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="min-h-[44px] px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? 'Validando...' : 'Desbloquear 🔓'}
+            </button>
           </div>
-        </form>
+        </div>
+      </form>
     </BottomSheetShell>
   );
 }
