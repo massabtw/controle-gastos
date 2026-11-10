@@ -82,11 +82,13 @@ public class AdminAuthTests
     }
 
     [Fact]
-    public void GetAdminPassword_WhenNoConfig_DefaultsTo1212()
+    public void GetAdminPassword_WhenNoConfig_DefaultsToUchiha()
     {
         var emptyConfig = new ConfigurationBuilder().Build();
         var defaultPin = AdminTokenHelper.GetAdminPassword(emptyConfig);
-        Assert.Equal("1212", defaultPin);
+        Assert.Equal("uchiha", defaultPin);
+        Assert.True(AdminTokenHelper.IsValidPassword("uchiha", _config));
+        Assert.True(AdminTokenHelper.IsValidToken("uchiha", _config));
     }
 
     [Fact]
