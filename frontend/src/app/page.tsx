@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Flame, ArrowRight } from 'lucide-react';
 import { api, DashboardSummary, ProjectionCycle, CardExpense } from '@/lib/api';
 import { Header } from '@/components/Header';
 import { QuickCommandBar } from '@/components/QuickCommandBar';
@@ -24,6 +25,109 @@ import {
   PinModal,
 } from '@/components/Modals';
 
+interface AdminLockGateProps {
+  onUnlock: (token: string) => void;
+}
+
+function AdminLockGate({ onUnlock }: AdminLockGateProps) {
+  const [pin, setPin] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pin.trim()) {
+      setErrorMessage('Digite o PIN de administrador.');
+      return;
+    }
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await api.loginAdmin(pin.trim());
+      if (res && res.token) {
+        api.setAdminToken(res.token);
+        onUnlock(res.token);
+      } else {
+        setErrorMessage('PIN incorreto. Digite o PIN correto.');
+        setPin('');
+      }
+    } catch {
+      setErrorMessage('PIN incorreto. Digite o PIN correto (1212).');
+      setPin('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center p-4 relative overflow-hidden select-none font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
+      {/* Background ambient lighting */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-600/10 blur-[140px] rounded-full" />
+      </div>
+
+      <div className="relative w-full max-w-sm mx-auto flex flex-col items-center text-center">
+        {/* Brand Icon */}
+        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-xl shadow-emerald-500/20 text-zinc-950 mb-4 transition-transform active:scale-95">
+          <Flame className="w-9 h-9 fill-zinc-950" />
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-100 mb-1">BurnTracker</h1>
+        <p className="text-xs text-zinc-400 mb-6">Painel Protegido • Digite o PIN de Acesso</p>
+
+        {/* Lock Card */}
+        <form
+          onSubmit={handleSubmit}
+          className="w-full bg-zinc-900/80 border border-zinc-800/90 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-4"
+        >
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+              PIN de Acesso
+            </label>
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={8}
+              autoFocus
+              value={pin}
+              onChange={(e) => {
+                setPin(e.target.value);
+                setErrorMessage(null);
+              }}
+              placeholder="••••"
+              className="w-full min-h-[56px] text-center tracking-[0.5em] text-2xl font-mono font-bold px-4 py-2 rounded-2xl bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+            />
+            {errorMessage && (
+              <p className="text-xs text-rose-400 font-medium pt-1">
+                ⚠️ {errorMessage}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !pin.trim()}
+            className="w-full min-h-[48px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 text-sm font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {loading ? (
+              <span>Validando...</span>
+            ) : (
+              <>
+                <span>Desbloquear</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              </>
+            )}
+          </button>
+
+          <p className="text-[11px] text-zinc-500 pt-1 leading-relaxed">
+            O token de acesso permanecerá ativo por 90 dias neste dispositivo.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [selectedCycle, setSelectedCycle] = useState<string>('');
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -33,8 +137,9 @@ export default function Home() {
   const [mainTab, setMainTab] = useState<'expenses' | 'subscriptions' | 'projections'>('expenses');
 
   // Admin security & Privacy Mode
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isPrivacyBlur, setIsPrivacyBlur] = useState(true);
+  const [isPrivacyBlur, setIsPrivacyBlur] = useState(false);
 
   // Modals state
   const [isNewExpenseOpen, setIsNewExpenseOpen] = useState(false);
@@ -57,7 +162,7 @@ export default function Home() {
       const token = api.getAdminToken();
       if (!token) {
         setIsAdmin(false);
-        setIsPrivacyBlur(true);
+        setIsCheckingAuth(false);
         return;
       }
 
@@ -69,12 +174,13 @@ export default function Home() {
         } else {
           api.clearAdminToken();
           setIsAdmin(false);
-          setIsPrivacyBlur(true);
         }
       } catch {
-        // If server is cold or token invalid, default to guest
+        // If server is cold or token invalid, default to lock screen
+        api.clearAdminToken();
         setIsAdmin(false);
-        setIsPrivacyBlur(true);
+      } finally {
+        setIsCheckingAuth(false);
       }
     };
 
@@ -87,7 +193,9 @@ export default function Home() {
       setIsServerWakingUp(Boolean(customEvent.detail));
     };
     const handlePinRequired = () => {
-      setIsPinModalOpen(true);
+      api.clearAdminToken();
+      setIsAdmin(false);
+      setIsPinModalOpen(false);
     };
 
     window.addEventListener('render_server_waking_up', handleWakingUp);
@@ -108,14 +216,14 @@ export default function Home() {
   };
 
   const handleLogoutAdmin = () => {
-    if (confirm('Deseja bloquear o painel e voltar ao modo Visitante (Apenas Leitura)?')) {
+    if (confirm('Deseja bloquear o painel e voltar à tela de bloqueio?')) {
       api.clearAdminToken();
       setIsAdmin(false);
-      setIsPrivacyBlur(true);
     }
   };
 
   const loadData = useCallback(async () => {
+    if (!isAdmin) return;
     try {
       const [sum, proj] = await Promise.all([
         api.getDashboard(selectedCycle || undefined),
@@ -136,16 +244,39 @@ export default function Home() {
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     }
-  }, [selectedCycle]);
+  }, [isAdmin, selectedCycle]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (isAdmin) {
+      loadData();
+    }
+  }, [isAdmin, loadData]);
 
   const handleCycleChange = (cycle: string) => {
     setSelectedCycle(cycle);
     setSelectedCategory(null);
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen w-full bg-zinc-950 flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-xl shadow-emerald-500/20 text-zinc-950 animate-pulse">
+          <Flame className="w-9 h-9 fill-zinc-950" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <AdminLockGate
+        onUnlock={() => {
+          setIsAdmin(true);
+          setIsPrivacyBlur(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -199,9 +330,6 @@ export default function Home() {
           onInvoiceStatusChanged={loadData}
           isAdmin={isAdmin}
           onRequireAdmin={() => setIsPinModalOpen(true)}
-        />
-          onCommitmentPaid={loadData}
-          onInvoiceStatusChanged={loadData}
         />
 
         {/* Lack of Judgment Simulator */}

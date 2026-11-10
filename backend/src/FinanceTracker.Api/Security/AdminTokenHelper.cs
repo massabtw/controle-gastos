@@ -12,7 +12,7 @@ public static class AdminTokenHelper
         return Environment.GetEnvironmentVariable("ADMIN_PASSWORD")
             ?? configuration["Admin:Password"]
             ?? Environment.GetEnvironmentVariable("APP_PIN")
-            ?? "123456";
+            ?? "1212";
     }
 
     public static string GenerateToken(string password)

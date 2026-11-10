@@ -17,7 +17,6 @@ interface HeaderProps {
   isAdmin?: boolean;
   isPrivacyBlur?: boolean;
   onTogglePrivacy?: () => void;
-  onToggleAdmin?: () => void;
   onLogoutAdmin?: () => void;
 }
 
@@ -34,7 +33,6 @@ export function Header({
   isAdmin = false,
   isPrivacyBlur = false,
   onTogglePrivacy,
-  onToggleAdmin,
   onLogoutAdmin,
 }: HeaderProps) {
   // Helper to step cycles

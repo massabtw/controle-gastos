@@ -18,32 +18,33 @@ public class PinProtectionMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // 1. Allow safe read-only methods for public dashboard viewing
-        var method = context.Request.Method;
-        if (HttpMethods.IsGet(method) || HttpMethods.IsOptions(method) || HttpMethods.IsHead(method))
+        // 1. Always allow OPTIONS pre-flight requests (CORS)
+        if (HttpMethods.IsOptions(context.Request.Method))
         {
             await _next(context);
             return;
         }
 
-        // 2. Allow public write endpoints:
-        // - Auth login
-        // - Telegram Webhook
-        // - iOS Shortcut webhook (protected by its own SecretPin)
-        // - Health / Ping
+        // 2. Allow public bypass endpoints:
+        // - Auth endpoints (/api/auth/login, /api/auth/verify)
+        // - Telegram Webhook (/api/telegram/*)
+        // - iOS Shortcut webhook (/api/integrations/ios-shortcut - protected by SecretPin)
+        // - Health / Ping / Root / Swagger
         var path = context.Request.Path.Value?.ToLowerInvariant() ?? string.Empty;
-        if (path.StartsWith("/api/auth/login") ||
+        if (path.StartsWith("/api/auth/") ||
             path.StartsWith("/api/telegram") ||
             path.StartsWith("/api/integrations/ios-shortcut") ||
             path.StartsWith("/api/ping") ||
             path.StartsWith("/health") ||
-            path == "/")
+            path.StartsWith("/swagger") ||
+            path == "/" ||
+            path == "/favicon.ico")
         {
             await _next(context);
             return;
         }
 
-        // 3. For all other state-changing requests (POST, PUT, DELETE, PATCH):
+        // 3. Protect ALL Dashboard endpoints (GET, POST, PUT, DELETE):
         var token = context.Request.Headers["X-Admin-Token"].FirstOrDefault()
             ?? context.Request.Headers["X-App-Pin"].FirstOrDefault()
             ?? context.Request.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "").Trim();
@@ -55,7 +56,7 @@ public class PinProtectionMiddleware
 
             var responseObj = new
             {
-                message = "Acesso não autorizado. Autentique-se como administrador para realizar alterações.",
+                message = "Acesso não autorizado. Autentique-se como administrador para acessar o painel.",
                 requiresAuth = true
             };
             await context.Response.WriteAsync(JsonSerializer.Serialize(responseObj));
