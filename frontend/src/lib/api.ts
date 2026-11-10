@@ -194,7 +194,17 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('finance_app_pin_required'));
+        const method = (options?.method || 'GET').toUpperCase();
+        const isWriteMethod = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+        const isGuest = localStorage.getItem('guest_mode') === 'true';
+
+        if (isWriteMethod) {
+          // A write operation requires admin authentication: trigger PIN modal prompt
+          window.dispatchEvent(new CustomEvent('admin_pin_modal_required'));
+        } else if (!isGuest) {
+          // Only kick user to the full-screen Lock Gate if they are NOT in Guest Mode
+          window.dispatchEvent(new CustomEvent('finance_app_pin_required'));
+        }
       }
       throw new Error('Acesso de administrador necessário. Autentique-se com o PIN.');
     }
@@ -391,15 +401,19 @@ export const api = {
       body: JSON.stringify({ password }),
     }),
 
-  verifyAdmin: (token?: string) => {
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['X-Admin-Token'] = token;
-      headers['X-App-Pin'] = token;
+  verifyAdmin: async (token?: string) => {
+    if (!token) return { valid: false, message: 'Nenhum token fornecido' };
+    const headers: Record<string, string> = {
+      'X-Admin-Token': token,
+      'X-App-Pin': token,
+    };
+    try {
+      return await request<{ valid: boolean; message: string }>(`/api/auth/verify`, {
+        headers,
+      });
+    } catch {
+      return { valid: false, message: 'Token inválido' };
     }
-    return request<{ valid: boolean; message: string }>(`/api/auth/verify`, {
-      headers,
-    });
   },
 
   getAdminToken: (): string | null => {
@@ -411,16 +425,32 @@ export const api = {
     if (typeof window === 'undefined') return;
     localStorage.setItem('admin_token', token.trim());
     localStorage.setItem('finance_app_pin', token.trim());
+    localStorage.removeItem('guest_mode');
   },
 
   clearAdminToken: () => {
     if (typeof window === 'undefined') return;
     localStorage.removeItem('admin_token');
     localStorage.removeItem('finance_app_pin');
+    localStorage.removeItem('guest_mode');
   },
 
   hasAdminToken: (): boolean => {
     if (typeof window === 'undefined') return false;
     return Boolean(localStorage.getItem('admin_token') || localStorage.getItem('finance_app_pin'));
+  },
+
+  isGuestMode: (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('guest_mode') === 'true';
+  },
+
+  setGuestMode: (enabled: boolean) => {
+    if (typeof window === 'undefined') return;
+    if (enabled) {
+      localStorage.setItem('guest_mode', 'true');
+    } else {
+      localStorage.removeItem('guest_mode');
+    }
   },
 };

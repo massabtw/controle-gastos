@@ -190,12 +190,23 @@ export default function Home() {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isServerWakingUp, setIsServerWakingUp] = useState(false);
 
-  // Check initial admin token on mount
+  // Check initial admin token or guest mode on mount
   useEffect(() => {
-    const checkAdmin = async () => {
+    const checkAuth = async () => {
+      const isGuestStored = api.isGuestMode();
       const token = api.getAdminToken();
+
+      // If user has chosen Guest Mode and has no admin token, maintain Guest Mode without calling verifyAdmin
+      if (isGuestStored && !token) {
+        setIsGuest(true);
+        setIsAdmin(false);
+        setIsCheckingAuth(false);
+        return;
+      }
+
       if (!token) {
         setIsAdmin(false);
+        setIsGuest(false);
         setIsCheckingAuth(false);
         return;
       }
@@ -203,6 +214,7 @@ export default function Home() {
       if (token.trim() === '1212' || token.trim().toLowerCase() === 'uchiha') {
         setIsAdmin(true);
         setIsGuest(false);
+        api.setGuestMode(false);
         setIsCheckingAuth(false);
         return;
       }
@@ -212,20 +224,31 @@ export default function Home() {
         if (res && res.valid) {
           setIsAdmin(true);
           setIsGuest(false);
+          api.setGuestMode(false);
         } else {
           api.clearAdminToken();
           setIsAdmin(false);
+          if (isGuestStored) {
+            setIsGuest(true);
+          }
         }
       } catch {
-        // If server is cold or token invalid, default to lock screen
-        api.clearAdminToken();
-        setIsAdmin(false);
+        if (token.trim() === '1212' || token.trim().toLowerCase() === 'uchiha') {
+          setIsAdmin(true);
+          setIsGuest(false);
+        } else {
+          api.clearAdminToken();
+          setIsAdmin(false);
+          if (isGuestStored) {
+            setIsGuest(true);
+          }
+        }
       } finally {
         setIsCheckingAuth(false);
       }
     };
 
-    checkAdmin();
+    checkAuth();
   }, []);
 
   useEffect(() => {
@@ -234,18 +257,27 @@ export default function Home() {
       setIsServerWakingUp(Boolean(customEvent.detail));
     };
     const handlePinRequired = () => {
-      api.clearAdminToken();
-      setIsAdmin(false);
-      setIsGuest(false);
-      setIsPinModalOpen(false);
+      // Only lock back to gate if NOT in guest mode!
+      if (!api.isGuestMode()) {
+        api.clearAdminToken();
+        setIsAdmin(false);
+        setIsGuest(false);
+        setIsPinModalOpen(false);
+      }
+    };
+    const handleAdminModalRequired = () => {
+      // Prompt PIN modal for write actions without resetting Guest Mode!
+      setIsPinModalOpen(true);
     };
 
     window.addEventListener('render_server_waking_up', handleWakingUp);
     window.addEventListener('finance_app_pin_required', handlePinRequired);
+    window.addEventListener('admin_pin_modal_required', handleAdminModalRequired);
 
     return () => {
       window.removeEventListener('render_server_waking_up', handleWakingUp);
       window.removeEventListener('finance_app_pin_required', handlePinRequired);
+      window.removeEventListener('admin_pin_modal_required', handleAdminModalRequired);
     };
   }, []);
 
@@ -260,6 +292,7 @@ export default function Home() {
   const handleLogoutAdmin = () => {
     if (confirm('Deseja bloquear o painel e voltar à tela de bloqueio?')) {
       api.clearAdminToken();
+      api.setGuestMode(false);
       setIsAdmin(false);
       setIsGuest(false);
     }
@@ -314,10 +347,12 @@ export default function Home() {
     return (
       <AdminLockGate
         onUnlock={() => {
+          api.setGuestMode(false);
           setIsAdmin(true);
           setIsGuest(false);
         }}
         onEnterAsGuest={() => {
+          api.setGuestMode(true);
           setIsGuest(true);
           setIsAdmin(false);
         }}
@@ -546,6 +581,7 @@ export default function Home() {
         onClose={() => setIsPinModalOpen(false)}
         onSuccess={(token) => {
           if (token) {
+            api.setGuestMode(false);
             setIsAdmin(true);
             setIsGuest(false);
           }
