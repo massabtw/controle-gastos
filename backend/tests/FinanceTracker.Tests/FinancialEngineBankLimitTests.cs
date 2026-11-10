@@ -48,8 +48,10 @@ public class FinancialEngineBankLimitTests
 
     private class FakeCommitmentRepo : IFixedCommitmentRepository
     {
+        public List<FixedCommitmentEntity> Commitments { get; } = new();
+
         public Task<IEnumerable<FixedCommitmentEntity>> GetAllAsync(bool onlyActive = true) =>
-            Task.FromResult<IEnumerable<FixedCommitmentEntity>>(new List<FixedCommitmentEntity>());
+            Task.FromResult<IEnumerable<FixedCommitmentEntity>>(Commitments);
 
         public Task<FixedCommitmentEntity?> GetByIdAsync(int id) => Task.FromResult<FixedCommitmentEntity?>(null);
         public Task<int> CreateAsync(FixedCommitmentEntity entity) => Task.FromResult(1);
@@ -162,5 +164,117 @@ public class FinancialEngineBankLimitTests
         var summary202612AfterPaid = (await service.GetDashboardSummaryAsync("2026-12")).Value!;
         Assert.Equal(1105.30m, summary202612AfterPaid.AvailableBankCreditLimit);
         Assert.Equal(94.70m, summary202612AfterPaid.TotalUnpaidCardUsage);
+    }
+
+    [Fact]
+    public async Task GetDashboardSummaryAsync_SubscriptionBeforeBillingDay_IsScheduled_NotAddedToInvoice_NotReducingBankLimit_ReservedInRemainingCap()
+    {
+        var uow = new FakeUnitOfWork();
+        var commitmentRepo = (FakeCommitmentRepo)uow.FixedCommitment;
+
+        // Spotify: 30.00, billing day 15. For cycle 2026-12 (closing day 8), charge date is 2026-11-15.
+        commitmentRepo.Commitments.Add(new FixedCommitmentEntity
+        {
+            Id = 1,
+            Title = "Spotify",
+            Amount = 30.00m,
+            CommitmentType = "SUBSCRIPTION",
+            PaymentSource = "CARD",
+            BillingDay = 15,
+            StartCycle = "2026-12",
+            IsActive = true
+        });
+
+        var service = new FinancialEngineService(uow, NullLogger<FinancialEngineService>.Instance);
+        var refDate = new DateTime(2026, 11, 10); // 5 days before charge date (Nov 15)
+
+        var summary = (await service.GetDashboardSummaryAsync("2026-12", refDate)).Value!;
+
+        var sub = Assert.Single(summary.ActiveSubscriptions);
+        Assert.False(sub.IsCharged);
+        Assert.Equal("Agendado (Dia 15)", sub.Badge);
+        Assert.Equal(0m, summary.CurrentInvoiceTotal); // NOT in current invoice!
+        Assert.Equal(30.00m, summary.ScheduledSubscriptionsTotal);
+        Assert.Equal(0m, summary.ChargedSubscriptionsTotal);
+        Assert.Equal(1200.00m, summary.AvailableBankCreditLimit); // NOT deducted from bank limit!
+        Assert.Equal(1170.00m, summary.RemainingBudget); // IS reserved in remaining cap (1200 - 30)!
+    }
+
+    [Fact]
+    public async Task GetDashboardSummaryAsync_SubscriptionOnOrAfterBillingDay_IsCharged_AddedToInvoice_ReducesBankLimit_ReservedInRemainingCap()
+    {
+        var uow = new FakeUnitOfWork();
+        var commitmentRepo = (FakeCommitmentRepo)uow.FixedCommitment;
+
+        // Spotify: 30.00, billing day 15. For cycle 2026-12 (closing day 8), charge date is 2026-11-15.
+        commitmentRepo.Commitments.Add(new FixedCommitmentEntity
+        {
+            Id = 1,
+            Title = "Spotify",
+            Amount = 30.00m,
+            CommitmentType = "SUBSCRIPTION",
+            PaymentSource = "CARD",
+            BillingDay = 15,
+            StartCycle = "2026-12",
+            IsActive = true
+        });
+
+        var service = new FinancialEngineService(uow, NullLogger<FinancialEngineService>.Instance);
+        var refDate = new DateTime(2026, 11, 15); // On charge date!
+
+        var summary = (await service.GetDashboardSummaryAsync("2026-12", refDate)).Value!;
+
+        var sub = Assert.Single(summary.ActiveSubscriptions);
+        Assert.True(sub.IsCharged);
+        Assert.Equal("Cobrado", sub.Badge);
+        Assert.Equal(30.00m, summary.CurrentInvoiceTotal); // IS in current invoice!
+        Assert.Equal(30.00m, summary.ChargedSubscriptionsTotal);
+        Assert.Equal(0m, summary.ScheduledSubscriptionsTotal);
+        Assert.Equal(1170.00m, summary.AvailableBankCreditLimit); // IS deducted from bank limit!
+        Assert.Equal(1170.00m, summary.RemainingBudget); // IS reserved in remaining cap (1200 - 30)!
+    }
+
+    [Fact]
+    public async Task GetDashboardSummaryAsync_WhenSubscriptionIsMaterializedInCardExpenses_AvoidsDoubleCounting()
+    {
+        var uow = new FakeUnitOfWork();
+        var commitmentRepo = (FakeCommitmentRepo)uow.FixedCommitment;
+        var cardRepo = (FakeCardExpenseRepo)uow.CardExpense;
+
+        commitmentRepo.Commitments.Add(new FixedCommitmentEntity
+        {
+            Id = 1,
+            Title = "Spotify",
+            Amount = 30.00m,
+            CommitmentType = "SUBSCRIPTION",
+            PaymentSource = "CARD",
+            BillingDay = 15,
+            StartCycle = "2026-12",
+            IsActive = true
+        });
+
+        // Already materialized as an actual expense in CardExpenses!
+        cardRepo.Expenses.Add(new CardExpenseEntity
+        {
+            Id = 10,
+            Description = "Spotify Brasil",
+            Amount = 30.00m,
+            BillingCycle = "2026-12",
+            PaymentMethod = "CARD"
+        });
+
+        var service = new FinancialEngineService(uow, NullLogger<FinancialEngineService>.Instance);
+        var refDate = new DateTime(2026, 11, 15);
+
+        var summary = (await service.GetDashboardSummaryAsync("2026-12", refDate)).Value!;
+
+        var sub = Assert.Single(summary.ActiveSubscriptions);
+        Assert.True(sub.IsCharged);
+        Assert.Equal("Cobrado", sub.Badge);
+        // Current invoice should be 30 (from manualCardExpensesTotal), NOT 60!
+        Assert.Equal(30.00m, summary.CurrentInvoiceTotal);
+        Assert.Equal(0m, summary.ChargedSubscriptionsTotal); // unmaterialized charged is 0
+        Assert.Equal(1170.00m, summary.AvailableBankCreditLimit); // NOT 1140!
+        Assert.Equal(1170.00m, summary.RemainingBudget); // NOT 1140!
     }
 }

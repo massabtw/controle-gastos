@@ -21,12 +21,12 @@ public class FinancialEngineService : IFinancialEngineService
         _logger = logger;
     }
 
-    public async Task<Result<DashboardSummaryModel>> GetDashboardSummaryAsync(string? targetCycle = null)
+    public async Task<Result<DashboardSummaryModel>> GetDashboardSummaryAsync(string? targetCycle = null, DateTime? referenceDate = null)
     {
         try
         {
             var profile = await _unitOfWork.FinancialProfile.GetProfileAsync();
-            var now = DateTime.Now;
+            var now = referenceDate ?? BillingCycleCalculator.GetCurrentBrazilDate();
 
             var currentActiveCycle = BillingCycleCalculator.GetTargetBillingCycle(now, profile.ClosingDay);
             var inspectedCycle = string.IsNullOrWhiteSpace(targetCycle) ? currentActiveCycle : targetCycle;
@@ -38,11 +38,15 @@ public class FinancialEngineService : IFinancialEngineService
             var cycleState = cycleComparison < 0 ? "CLOSED" : (cycleComparison > 0 ? "FUTURE" : "CURRENT");
 
             var allCommitments = (await _unitOfWork.FixedCommitment.GetAllAsync(onlyActive: true)).ToList();
+            var cycleExpensesEntities = (await _unitOfWork.CardExpense.GetByCycleAsync(inspectedCycle)).ToList();
+
             var activeFixedCommitmentsList = new List<ActiveCommitmentModel>();
             var activeSubscriptionsList = new List<ActiveCommitmentModel>();
             var activeCommitmentsMerged = new List<ActiveCommitmentModel>();
             decimal totalFixedCommitments = 0m;
             decimal cardSubscriptionsTotal = 0m;
+            decimal chargedSubscriptionsTotal = 0m;
+            decimal scheduledSubscriptionsTotal = 0m;
 
             foreach (var commitment in allCommitments)
             {
@@ -57,15 +61,50 @@ public class FinancialEngineService : IFinancialEngineService
                         continue;
                     }
 
-                    var subModel = commitment.ToActiveModel("Mensal", inspectedCycle);
+                    var billingDay = commitment.BillingDay ?? 1;
+                    if (billingDay < 1) billingDay = 1;
+
+                    var expectedChargeDate = BillingCycleCalculator.GetSubscriptionChargeDateForCycle(inspectedCycle, billingDay, profile.ClosingDay);
+                    bool isCharged = cycleState == "CLOSED" || (cycleState != "FUTURE" && now.Date >= expectedChargeDate.Date);
+
+                    var subModel = commitment.ToActiveModel(isCharged ? "Cobrado" : $"Agendado (Dia {billingDay})", inspectedCycle);
                     subModel.CommitmentType = "SUBSCRIPTION";
                     subModel.PaymentSource = string.IsNullOrWhiteSpace(commitment.PaymentSource) ? "CARD" : commitment.PaymentSource;
+                    subModel.IsCharged = isCharged;
+                    subModel.StatusLabel = isCharged ? "Cobrado" : $"Agendado (Dia {billingDay})";
+                    subModel.Badge = isCharged ? "Cobrado" : $"Agendado (Dia {billingDay})";
+                    subModel.ExpectedChargeDate = expectedChargeDate;
+
                     activeSubscriptionsList.Add(subModel);
                     activeCommitmentsMerged.Add(subModel);
 
                     if (string.Equals(subModel.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase))
                     {
                         cardSubscriptionsTotal += commitment.Amount;
+
+                        var isMaterialized = cycleExpensesEntities.Any(e =>
+                            e.PaymentMethod == "CARD" &&
+                            !string.IsNullOrWhiteSpace(e.Description) &&
+                            !string.IsNullOrWhiteSpace(commitment.Title) &&
+                            (string.Equals(e.Description.Trim(), commitment.Title.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                             e.Description.Contains(commitment.Title, StringComparison.OrdinalIgnoreCase) ||
+                             commitment.Title.Contains(e.Description, StringComparison.OrdinalIgnoreCase)) &&
+                            Math.Abs(e.Amount - commitment.Amount) <= 1.00m);
+
+                        if (isMaterialized)
+                        {
+                            subModel.IsCharged = true;
+                            subModel.Badge = "Cobrado";
+                            subModel.StatusLabel = "Cobrado";
+                        }
+                        else if (isCharged)
+                        {
+                            chargedSubscriptionsTotal += commitment.Amount;
+                        }
+                        else
+                        {
+                            scheduledSubscriptionsTotal += commitment.Amount;
+                        }
                     }
                 }
                 else
@@ -90,14 +129,12 @@ public class FinancialEngineService : IFinancialEngineService
                 ? profile.CustomCardCap.Value
                 : formulaHardCap;
 
-            // Expenses in target cycle
-            var cycleExpensesEntities = (await _unitOfWork.CardExpense.GetByCycleAsync(inspectedCycle)).ToList();
             var manualCardExpensesTotal = cycleExpensesEntities.Where(e => e.PaymentMethod == "CARD").Sum(e => e.Amount);
-            var currentInvoiceTotal = manualCardExpensesTotal + cardSubscriptionsTotal;
+            var currentInvoiceTotal = manualCardExpensesTotal + chargedSubscriptionsTotal;
             var pixCaixinhaUsedInCycle = cycleExpensesEntities.Where(e => e.PaymentMethod == "PIX_CAIXINHA" && e.DeductFromCycleCap).Sum(e => e.Amount);
             var otherDeductibleExpenses = cycleExpensesEntities.Where(e => e.PaymentMethod != "CARD" && e.PaymentMethod != "PIX_CAIXINHA" && e.PaymentMethod != "PIX_INFLOW" && e.DeductFromCycleCap).Sum(e => e.Amount);
             var totalSpentInCycle = currentInvoiceTotal + pixCaixinhaUsedInCycle + otherDeductibleExpenses;
-            var remainingBudget = cardHardCap - totalSpentInCycle;
+            var remainingBudget = cardHardCap - (manualCardExpensesTotal + chargedSubscriptionsTotal + scheduledSubscriptionsTotal + pixCaixinhaUsedInCycle + otherDeductibleExpenses);
 
             var daysUntilClosing = BillingCycleCalculator.GetDaysUntilClosing(now, profile.ClosingDay, inspectedCycle);
             var availablePerDay = (daysUntilClosing > 0 && remainingBudget > 0)
@@ -155,7 +192,62 @@ public class FinancialEngineService : IFinancialEngineService
 
             // Available Bank Credit Limit (Global across all billing cycles)
             var bankLimit = profile.CreditCardLimit > 0 ? profile.CreditCardLimit : 2500.00m;
-            var totalUnpaidCardUsage = await _unitOfWork.CardExpense.GetTotalUnpaidCardExpensesAsync();
+            var totalUnpaidCardExpenses = await _unitOfWork.CardExpense.GetTotalUnpaidCardExpensesAsync();
+
+            // Calculate unpaid charged subscriptions that are not materialized in CardExpenses
+            var candidateCycles = new HashSet<string> { currentActiveCycle };
+            if (!string.IsNullOrWhiteSpace(inspectedCycle))
+                candidateCycles.Add(inspectedCycle);
+            candidateCycles.Add(BillingCycleCalculator.AddMonthsToCycle(currentActiveCycle, -1));
+
+            decimal unpaidChargedSubscriptionsTotal = 0m;
+            foreach (var candidateCycle in candidateCycles)
+            {
+                var cyclePayment = await _unitOfWork.InvoicePayment.GetByCycleAsync(candidateCycle);
+                if (cyclePayment != null && cyclePayment.IsPaid)
+                    continue;
+
+                var candidateExpenses = (candidateCycle == inspectedCycle)
+                    ? cycleExpensesEntities
+                    : (await _unitOfWork.CardExpense.GetByCycleAsync(candidateCycle)).ToList();
+
+                foreach (var commitment in allCommitments.Where(c =>
+                    string.Equals(c.CommitmentType, "SUBSCRIPTION", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(c.PaymentSource, "CARD", StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!string.IsNullOrWhiteSpace(commitment.StartCycle) &&
+                        string.CompareOrdinal(candidateCycle, commitment.StartCycle) < 0)
+                    {
+                        continue;
+                    }
+
+                    var bDay = commitment.BillingDay ?? 1;
+                    if (bDay < 1) bDay = 1;
+                    var chargeDate = BillingCycleCalculator.GetSubscriptionChargeDateForCycle(candidateCycle, bDay, profile.ClosingDay);
+
+                    var cComparison = string.CompareOrdinal(candidateCycle, currentActiveCycle);
+                    bool isSubCharged = cComparison < 0 || (cComparison == 0 && now.Date >= chargeDate.Date);
+
+                    if (!isSubCharged)
+                        continue;
+
+                    var isMaterialized = candidateExpenses.Any(e =>
+                        e.PaymentMethod == "CARD" &&
+                        !string.IsNullOrWhiteSpace(e.Description) &&
+                        !string.IsNullOrWhiteSpace(commitment.Title) &&
+                        (string.Equals(e.Description.Trim(), commitment.Title.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                         e.Description.Contains(commitment.Title, StringComparison.OrdinalIgnoreCase) ||
+                         commitment.Title.Contains(e.Description, StringComparison.OrdinalIgnoreCase)) &&
+                        Math.Abs(e.Amount - commitment.Amount) <= 1.00m);
+
+                    if (!isMaterialized)
+                    {
+                        unpaidChargedSubscriptionsTotal += commitment.Amount;
+                    }
+                }
+            }
+
+            var totalUnpaidCardUsage = totalUnpaidCardExpenses + unpaidChargedSubscriptionsTotal;
             var totalFutureInstallmentsOnCard = await _unitOfWork.CardExpense.GetFutureCommittedInstallmentsTotalAsync(inspectedCycle);
             var availableBankCreditLimit = Math.Max(0, bankLimit - totalUnpaidCardUsage);
 
@@ -229,6 +321,8 @@ public class FinancialEngineService : IFinancialEngineService
 
                 ActiveSubscriptions = activeSubscriptionsList,
                 CardSubscriptionsTotal = cardSubscriptionsTotal,
+                ChargedSubscriptionsTotal = chargedSubscriptionsTotal,
+                ScheduledSubscriptionsTotal = scheduledSubscriptionsTotal,
 
                 CardHardCap = cardHardCap,
                 CardHardCapFormula = formulaHardCap,

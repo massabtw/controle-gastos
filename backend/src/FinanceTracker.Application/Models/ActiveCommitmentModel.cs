@@ -14,4 +14,7 @@ public class ActiveCommitmentModel
     public string? LastPaidCycle { get; set; }
     public bool IsPaidInCycle { get; set; }
     public bool IsPaidForCycle { get; set; }
+    public bool IsCharged { get; set; }
+    public string? StatusLabel { get; set; }
+    public DateTime? ExpectedChargeDate { get; set; }
 }

@@ -6,6 +6,6 @@ namespace FinanceTracker.Application.Interfaces.Invoices;
 public interface IInvoiceService
 {
     Task<Result<InvoicePaymentModel?>> GetInvoicePaymentAsync(string? cycle);
-    Task<Result<InvoiceTogglePaidResultModel>> TogglePaymentAsync(string? cycle);
+    Task<Result<InvoiceTogglePaidResultModel>> TogglePaymentAsync(string? cycle, DateTime? referenceDate = null);
     Task<Result<InvestSurplusResultModel>> InvestSurplusAsync(string? cycle);
 }

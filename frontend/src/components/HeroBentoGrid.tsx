@@ -314,14 +314,22 @@ export function HeroBentoGrid({
 
             {/* Card Subscriptions Pill if any */}
             {summary.cardSubscriptionsTotal > 0 && (
-              <div className="mt-1.5 p-2 rounded-xl bg-purple-950/30 border border-purple-500/30 text-[11px] font-mono flex items-center justify-between text-purple-300">
-                <span className="flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3 text-purple-400" />
-                  Assinaturas no Cartão:
-                </span>
-                <span className="font-bold">
-                  R$ {summary.cardSubscriptionsTotal.toFixed(2)} / mês
-                </span>
+              <div className="mt-1.5 p-2 rounded-xl bg-purple-950/30 border border-purple-500/30 text-[11px] font-mono space-y-1 text-purple-300">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 text-purple-400" />
+                    Assinaturas no Cartão:
+                  </span>
+                  <span className="font-bold">
+                    R$ {summary.cardSubscriptionsTotal.toFixed(2)} / mês
+                  </span>
+                </div>
+                {(summary.scheduledSubscriptionsTotal ?? 0) > 0 && (
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-purple-500/20 font-mono">
+                    <span className="text-emerald-400">Cobrado: R$ {(summary.chargedSubscriptionsTotal ?? 0).toFixed(2)}</span>
+                    <span className="text-purple-300">Agendado: R$ {(summary.scheduledSubscriptionsTotal ?? 0).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -391,56 +399,78 @@ export function HeroBentoGrid({
           </div>
         </div>
 
-        {/* Active fixed commitments list with Pay from Caixinha action */}
+        {/* Active fixed commitments & subscriptions list with status and Pay from Caixinha action */}
         <div className="pt-3 mt-3 border-t border-zinc-800/80 space-y-2">
           <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
             Compromissos do Ciclo:
           </span>
           <div className="flex flex-col gap-2">
-            {summary.activeFixedCommitments.map((c) => (
-              <div
-                key={c.id}
-                className="min-h-[44px] text-xs font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-3 py-1.5 rounded-xl flex items-center justify-between gap-2"
-              >
-                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                  <span className="text-zinc-300 font-medium truncate">{c.title}:</span>
-                  <span className="font-mono font-bold text-zinc-100 whitespace-nowrap">R$ {c.amount.toFixed(0)}</span>
-                  <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded whitespace-nowrap">
-                    {c.badge}
-                  </span>
-                </div>
+            {[...summary.activeFixedCommitments, ...(summary.activeSubscriptions || [])].map((c) => {
+              const isSubscription = c.commitmentType === 'SUBSCRIPTION';
+              const isCharged = c.isCharged || c.badge === 'Cobrado';
 
-                {/* Status & interactive toggle action for Caixinha commitments */}
-                {c.paymentSource === 'PIX_CAIXINHA' && (
-                  <button
-                    onClick={() => handleToggleCommitmentPaid(c.id)}
-                    disabled={payingId === c.id}
-                    title={
-                      c.isPaidInCycle
-                        ? 'Clique para desmarcar e estornar valor de volta para a Caixinha'
-                        : 'Clique para marcar como pago e debitar da Caixinha Nubank'
-                    }
-                    className={`min-h-[36px] shrink-0 whitespace-nowrap flex items-center gap-1 text-[11px] font-mono font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border group ${
-                      c.isPaidInCycle
-                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40'
-                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/30 hover:text-cyan-100'
-                    }`}
-                  >
-                    {payingId === c.id ? (
-                      <span>Aguarde...</span>
-                    ) : c.isPaidInCycle ? (
-                      <>
-                        <CheckCircle2 className="w-3 h-3 group-hover:hidden" />
-                        <span className="group-hover:hidden">✅ Pago</span>
-                        <span className="hidden group-hover:inline">Desmarcar ↩</span>
-                      </>
-                    ) : (
-                      <span>Dar Baixa 🐷</span>
+              return (
+                <div
+                  key={`${c.commitmentType}-${c.id}`}
+                  className="min-h-[44px] text-xs font-sans bg-zinc-800/80 text-zinc-300 border border-zinc-700/80 px-3 py-1.5 rounded-xl flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    {isSubscription && (
+                      <RefreshCw className="w-3 h-3 text-purple-400 shrink-0" />
                     )}
-                  </button>
-                )}
-              </div>
-            ))}
+                    <span className="text-zinc-300 font-medium truncate">{c.title}:</span>
+                    <span className="font-mono font-bold text-zinc-100 whitespace-nowrap">
+                      R$ {c.amount.toFixed(0)}
+                    </span>
+                    {isSubscription ? (
+                      <span
+                        className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md border whitespace-nowrap ${
+                          isCharged
+                            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                            : 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                        }`}
+                      >
+                        {isCharged ? '✅ Cobrado' : `🕒 ${c.badge}`}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded whitespace-nowrap">
+                        {c.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Status & interactive toggle action for Caixinha commitments */}
+                  {!isSubscription && c.paymentSource === 'PIX_CAIXINHA' && (
+                    <button
+                      onClick={() => handleToggleCommitmentPaid(c.id)}
+                      disabled={payingId === c.id}
+                      title={
+                        c.isPaidInCycle
+                          ? 'Clique para desmarcar e estornar valor de volta para a Caixinha'
+                          : 'Clique para marcar como pago e debitar da Caixinha Nubank'
+                      }
+                      className={`min-h-[36px] shrink-0 whitespace-nowrap flex items-center gap-1 text-[11px] font-mono font-semibold px-2.5 py-1.5 rounded-lg transition-all cursor-pointer border group ${
+                        c.isPaidInCycle
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/40'
+                          : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/30 hover:text-cyan-100'
+                      }`}
+                    >
+                      {payingId === c.id ? (
+                        <span>Aguarde...</span>
+                      ) : c.isPaidInCycle ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 group-hover:hidden" />
+                          <span className="group-hover:hidden">✅ Pago</span>
+                          <span className="hidden group-hover:inline">Desmarcar ↩</span>
+                        </>
+                      ) : (
+                        <span>Dar Baixa 🐷</span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </motion.div>

@@ -51,7 +51,7 @@ public class IosIntegrationServiceTests
 
     private class FakeFinancialEngineService : IFinancialEngineService
     {
-        public Task<Result<DashboardSummaryModel>> GetDashboardSummaryAsync(string? cycle = null)
+        public Task<Result<DashboardSummaryModel>> GetDashboardSummaryAsync(string? cycle = null, DateTime? referenceDate = null)
         {
             return Task.FromResult(Result<DashboardSummaryModel>.Success(new DashboardSummaryModel
             {

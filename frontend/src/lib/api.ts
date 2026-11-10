@@ -4,12 +4,15 @@ export interface ActiveCommitment {
   id: number;
   title: string;
   amount: number;
-  badge: string; // e.g. "1/5" or "Fixo" or "Mensal"
+  badge: string; // e.g. "1/5" or "Fixo" or "Mensal" or "Cobrado" or "Agendado (Dia X)"
   commitmentType?: 'PIX_COMMITMENT' | 'SUBSCRIPTION';
   paymentSource?: 'CARD' | 'PIX_CAIXINHA' | 'PIX_ACCOUNT';
   billingDay?: number | null;
   lastPaidCycle?: string | null;
   isPaidInCycle?: boolean;
+  isCharged?: boolean;
+  statusLabel?: string;
+  expectedChargeDate?: string;
 }
 
 export interface CategoryBreakdown {
@@ -36,6 +39,8 @@ export interface DashboardSummary {
   totalFixedCommitments: number;
   activeSubscriptions: ActiveCommitment[];
   cardSubscriptionsTotal: number;
+  chargedSubscriptionsTotal?: number;
+  scheduledSubscriptionsTotal?: number;
   cardHardCap: number;
   cardHardCapFormula: number;
   currentInvoiceTotal: number;

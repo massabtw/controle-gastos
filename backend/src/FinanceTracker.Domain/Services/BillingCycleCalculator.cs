@@ -110,4 +110,34 @@ public static class BillingCycleCalculator
 
         return (year, month);
     }
+
+    public static DateTime GetSubscriptionChargeDateForCycle(string cycle, int billingDay, int closingDay = 8)
+    {
+        var (year, month) = ParseCycle(cycle);
+        var cycleDate = new DateTime(year, month, 1);
+        var targetMonthDate = billingDay >= closingDay ? cycleDate.AddMonths(-1) : cycleDate;
+        var daysInMonth = DateTime.DaysInMonth(targetMonthDate.Year, targetMonthDate.Month);
+        var actualDay = Math.Clamp(billingDay, 1, daysInMonth);
+        return new DateTime(targetMonthDate.Year, targetMonthDate.Month, actualDay);
+    }
+
+    public static DateTime GetCurrentBrazilDate(DateTime? utcNow = null)
+    {
+        var utc = utcNow ?? DateTime.UtcNow;
+        try
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time"));
+        }
+        catch
+        {
+            try
+            {
+                return TimeZoneInfo.ConvertTimeFromUtc(utc, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+            }
+            catch
+            {
+                return utc.AddHours(-3);
+            }
+        }
+    }
 }

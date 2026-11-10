@@ -30,6 +30,8 @@ public class DashboardSummaryModel
 
     public List<ActiveCommitmentModel> ActiveSubscriptions { get; set; } = new();
     public decimal CardSubscriptionsTotal { get; set; }
+    public decimal ChargedSubscriptionsTotal { get; set; }
+    public decimal ScheduledSubscriptionsTotal { get; set; }
 
     public decimal CardHardCap { get; set; }
     public decimal CardHardCapFormula { get; set; }
