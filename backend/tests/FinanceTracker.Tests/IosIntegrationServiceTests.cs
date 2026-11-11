@@ -479,9 +479,68 @@ public class IosIntegrationServiceTests
     [InlineData("Pagamento de fatura de cartão R$ 450,00", true)]
     [InlineData("Comprovante de transferência 09 NOV 2026 Valor R$ 50,00 Tipo de transferência Pix", false)]
     [InlineData("Pix enviado com sucesso R$ 30,00 para João", false)]
+    [InlineData("Comprovante Pix R$ 25,00 para Uber Motorista", false)]
+    [InlineData("paguei a fatura R$ 450", false)]
+    [InlineData("simula R$ 1000 em 10x", false)]
     public void RegexExpenseParser_IsCardOrCheckoutText_ShouldCorrectlyDifferentiate(string input, bool expected)
     {
         var isCard = RegexExpenseParser.IsCardOrCheckoutText(input);
         Assert.Equal(expected, isCard);
+    }
+
+    [Theory]
+    [InlineData("paguei a fatura R$ 450", "PAY_INVOICE")]
+    [InlineData("simula R$ 1000 em 10x", "SIMULATE")]
+    [InlineData("ajustar fatura R$ 850,00", "SYNC_INVOICE")]
+    [InlineData("recebi R$ 120 de reembolso", "RECEIVE_PIX")]
+    public void RegexExpenseParser_Parse_ChatCommandsWithCardKeywords_ShouldNotBeHijacked(string command, string expectedIntent)
+    {
+        var result = RegexExpenseParser.Parse(command);
+        Assert.Equal(expectedIntent, result.Intent);
+    }
+
+    [Fact]
+    public void RegexExpenseParser_ParseNotificationOrCheckout_QuantityAndDeliveryTimeAndIntegerAmount_ShouldParseCleanly()
+    {
+        var checkoutWithQuantity = RegexExpenseParser.ParseNotificationOrCheckout("iFood - Pedido entregue em 30 min: 2x Hambúrguer Artesanal Total R$ 150");
+        Assert.NotNull(checkoutWithQuantity);
+        Assert.Equal("iFood", checkoutWithQuantity.Description);
+        Assert.Equal(150.00m, checkoutWithQuantity.Amount);
+        Assert.Equal(1, checkoutWithQuantity.Installments); // "2x Hambúrguer" is item quantity, NOT 2 installments
+        Assert.Equal("CARD", checkoutWithQuantity.PaymentMethod);
+    }
+
+    [Fact]
+    public async Task ProcessShortcutWebhookAsync_ExplicitPixAccountOrDeductFalse_ShouldRespectCallerSettings()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService();
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            RawText = "iFood - Pedido #999 Total R$ 40,00",
+            PaymentMethod = "PIX_ACCOUNT",
+            DeductFromCycleCap = false
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.True(result.IsSuccess, result.Error ?? "Error was null");
+        Assert.NotNull(expenseService.LastCreatedModel);
+        Assert.Equal("PIX_ACCOUNT", expenseService.LastCreatedModel.PaymentMethod);
+        Assert.False(expenseService.LastCreatedModel.DeductFromCycleCap);
     }
 }

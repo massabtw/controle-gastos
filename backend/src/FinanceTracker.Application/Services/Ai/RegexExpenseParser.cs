@@ -6,6 +6,90 @@ namespace FinanceTracker.Application.Services.Ai;
 
 public static class RegexExpenseParser
 {
+    private static readonly CultureInfo PtBrCulture = new("pt-BR");
+
+    private static readonly Regex PixExclusionRegex = new(
+        @"\b(tipo\s+de\s+transfer[eê]ncia\s+pix|pix\s+enviado|comprovante\s+(?:de\s+)?(?:transfer[eê]ncia\s+)?pix|transfer[eê]ncia\s+pix|chave\s+pix|pix\s+para)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex ChatCommandPrefixRegex = new(
+        @"^(?:/|)?(?:status|resumo|desfazer|apagar|paguei|fatura\s+paga|pagarfatura|pagar\s+fatura|quitei|investir|reinvestir|guardar|aplicar|ajustar\s+fatura|sincronizar\s+fatura|fatura\s+atual|saldo\s+caixinha|atualizar\s+caixinha|caixinha|adicionar|colocar|depositar|botar|recebi|pix\s+recebido|reembolso|recebido|recebimento|simular|simula)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex CardKeywordRegex = new(
+        @"\b(compra\s+aprovada|compra\s+no\s+cart[ãa]o|cart[ãa]o|cr[eé]dito|apple\s*pay|ifood|uber|mercado\s*livre|amazon|pedido|fatura)\b|\b(?:(?:em|parcelado\s+em)\s+\d{1,2}\s*x|\d{1,2}\s*x\s+(?:de\s+r\$|sem\s+juros))\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex CurrencyOrAmountRegex = new(
+        @"r\$\s*\d|\b(?:total|valor)\s*:?\s*\d+(?:[.,]\d{1,2})?\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex NotificationAmountPrimaryRegex = new(
+        @"(?:valor(?:\s+de)?|total(?:\s+do\s+pedido)?(?:\s*:)?|compra\s+de|de)\s*r\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex NotificationAmountCurrencyRegex = new(
+        @"r\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex NotificationAmountLabelRegex = new(
+        @"\b(?:total(?:\s+do\s+pedido)?|valor)\s*:?\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex InstallmentPatternRegex = new(
+        @"\b(?:(?:em|parcelado\s+em)\s+(\d{1,2})\s*x|(\d{1,2})\s*x\s+(?:de\s+r\$|sem\s+juros|no\s+cart[ãa]o))\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex NotificationMerchantEmRegex = new(
+        @"\b(?:aprovad[ao]\s+(?:no\s+(?:seu\s+)?cart[ãa]o(?:\s+de\s+cr[eé]dito)?(?:\s+final\s+\d+)?\s+)?em|compra\s+(?:de\s+r\$\s*[\d.,]+\s+)?(?:em\s+\d{1,2}\s*x\s+)?(?:aprovad[ao]\s+)?em)\s+(?!\d+\s*x\b)(?<merchant>[A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\*\-&']{2,60})",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex MerchantCutoffRegex = new(
+        @"^(.*?)(?:\s+(?:no\s+valor(?:\s+de)?|no\s+(?:seu\s+)?cart[ãa]o(?:\s+de\s+cr[eé]dito)?|com\s+(?:o\s+)?(?:seu\s+)?cart[ãa]o|pago\s+com|final\s+\d+|de\s+r\$|r\$|[àa]s\s+\d{2}:\d{2}|\d{2}:\d{2}|\.|\r|\n|$))",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly Regex InvalidMerchantCandidateRegex = new(
+        @"^(?:\d+|\d+\s*(?:min|minutos|seg|segundos|h|horas|dias)|andamento|preparo|prepara[çc][ãa]o|rota|breve|cart[ãa]o)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled
+    );
+
+    private static readonly (Regex Pattern, string CanonicalName)[] KnownAppPatterns =
+    {
+        (new Regex(@"\bifood\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "iFood"),
+        (new Regex(@"\buber(?:\s*\*trip|\s*eats)?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Uber"),
+        (new Regex(@"\bmercado\s*livre\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Mercado Livre"),
+        (new Regex(@"\bamazon(?:\s*prime)?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Amazon"),
+        (new Regex(@"\brappi\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Rappi"),
+        (new Regex(@"\b99(?:\s*app|\s*pop|\s*taxi)?\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "99"),
+        (new Regex(@"\bmcdonald'?s\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "McDonald's"),
+        (new Regex(@"\bburger\s*king\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Burger King"),
+        (new Regex(@"\bspotify\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Spotify"),
+        (new Regex(@"\bnetflix\b", RegexOptions.IgnoreCase | RegexOptions.Compiled), "Netflix")
+    };
+
+    private static readonly (string Prefix, string CanonicalName)[] CanonicalMerchantPrefixes =
+    {
+        ("ifood", "iFood"),
+        ("uber", "Uber"),
+        ("mercado livre", "Mercado Livre"),
+        ("amazon", "Amazon"),
+        ("rappi", "Rappi"),
+        ("mcdonald", "McDonald's"),
+        ("burger king", "Burger King"),
+        ("spotify", "Spotify"),
+        ("netflix", "Netflix")
+    };
+
     public static bool IsReceiptText(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return false;
@@ -18,43 +102,38 @@ public static class RegexExpenseParser
     {
         if (string.IsNullOrWhiteSpace(text)) return false;
 
-        var hasPixExclusion = Regex.IsMatch(text, @"\b(tipo\s+de\s+transfer[eê]ncia\s+pix|pix\s+enviado)\b", RegexOptions.IgnoreCase);
-        if (hasPixExclusion) return false;
+        if (PixExclusionRegex.IsMatch(text)) return false;
+        if (ChatCommandPrefixRegex.IsMatch(text.Trim())) return false;
 
-        var hasCardKeyword = Regex.IsMatch(
-            text,
-            @"\b(compra\s+aprovada|cart[ãa]o|cr[eé]dito|apple\s*pay|ifood|uber|mercado\s*livre|amazon|pedido|fatura)\b|\b\d+\s*x\b",
-            RegexOptions.IgnoreCase
-        );
+        // Also do not classify as card if it explicitly mentions Pix receipt/transfer keywords
+        if (Regex.IsMatch(text, @"\bpix\b", RegexOptions.IgnoreCase) && !Regex.IsMatch(text, @"\b(cart[ãa]o|cr[eé]dito|apple\s*pay)\b", RegexOptions.IgnoreCase))
+        {
+            return false;
+        }
 
-        return hasCardKeyword;
+        return CardKeywordRegex.IsMatch(text);
     }
 
     public static bool IsNotificationOrCheckoutText(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return false;
 
-        // Must NOT be an explicit Pix transfer receipt
-        if (Regex.IsMatch(input, @"\b(tipo\s+de\s+transfer[eê]ncia\s+pix|pix\s+enviado)\b", RegexOptions.IgnoreCase))
-            return false;
-
-        return IsCardOrCheckoutText(input)
-            && Regex.IsMatch(input, @"r\$\s*\d|\b\d+([.,]\d{2})\b", RegexOptions.IgnoreCase);
+        return IsCardOrCheckoutText(input) && CurrencyOrAmountRegex.IsMatch(input);
     }
 
     public static ParsedExpenseIntentModel? ParseNotificationOrCheckout(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
 
-        // 1. Amount Extraction
-        var amountMatch = Regex.Match(input, @"(?:valor(?:\s+de)?|total(?:\s+do\s+pedido)?(?:\s*:)?|de)?\s*r\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})", RegexOptions.IgnoreCase);
+        // 1. Amount Extraction (supports both decimal "45,90" and integer "150")
+        var amountMatch = NotificationAmountPrimaryRegex.Match(input);
         if (!amountMatch.Success)
         {
-            amountMatch = Regex.Match(input, @"r\$\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})", RegexOptions.IgnoreCase);
+            amountMatch = NotificationAmountCurrencyRegex.Match(input);
         }
         if (!amountMatch.Success)
         {
-            amountMatch = Regex.Match(input, @"\b(?:total|valor)\s*:?\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+[.,]\d{2})", RegexOptions.IgnoreCase);
+            amountMatch = NotificationAmountLabelRegex.Match(input);
         }
 
         if (!amountMatch.Success)
@@ -77,32 +156,27 @@ public static class RegexExpenseParser
             return null;
         }
 
-        // 2. Installments extraction (e.g. "em 3x", "3x", "12x")
+        // 2. Installments extraction (only explicit installment patterns, avoiding "2x Hambúrguer")
         int installments = 1;
-        var instMatch = Regex.Match(input, @"\b(?:em\s+)?(\d{1,2})\s*x\b", RegexOptions.IgnoreCase);
-        if (instMatch.Success && int.TryParse(instMatch.Groups[1].Value, out var inst) && inst > 0)
+        var instMatch = InstallmentPatternRegex.Match(input);
+        if (instMatch.Success)
         {
-            installments = inst;
+            var instStr = instMatch.Groups[1].Success ? instMatch.Groups[1].Value : instMatch.Groups[2].Value;
+            if (int.TryParse(instStr, out var inst) && inst > 0)
+            {
+                installments = inst;
+            }
         }
 
         // 3. Merchant / Description extraction
         string? merchant = null;
 
-        // Pattern A: Look for "em <LOJA>" (e.g. "Compra de R$ 45,90 aprovada em iFood", "aprovada no seu cartão em Mercado Livre")
-        var emMatch = Regex.Match(
-            input,
-            @"\b(?:aprovada\s+(?:no\s+(?:seu\s+)?cart[ãa]o(?:\s+de\s+cr[eé]dito)?(?:\s+final\s+\d+)?\s+)?em|compra\s+(?:de\s+r\$\s*[\d.,]+\s+)?(?:aprovada\s+)?em|aprovada\s+em|em)\s+(?!\d+\s*x\b)(?<merchant>[A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\*\-&]{2,60})",
-            RegexOptions.IgnoreCase
-        );
-
+        // Pattern A: Look for explicit purchase notification "aprovada em <LOJA>" or "compra ... em <LOJA>"
+        var emMatch = NotificationMerchantEmRegex.Match(input);
         if (emMatch.Success)
         {
             var candidate = emMatch.Groups["merchant"].Value.Trim();
-            var cutoff = Regex.Match(
-                candidate,
-                @"^(.*?)(?:\s+(?:no\s+valor(?:\s+de)?|no\s+(?:seu\s+)?cart[ãa]o(?:\s+de\s+cr[eé]dito)?|com\s+(?:o\s+)?(?:seu\s+)?cart[ãa]o|pago\s+com|final\s+\d+|de\s+r\$|r\$|[àa]s\s+\d{2}:\d{2}|\d{2}:\d{2}|\.|\r|\n|$))",
-                RegexOptions.IgnoreCase
-            );
+            var cutoff = MerchantCutoffRegex.Match(candidate);
 
             if (cutoff.Success && !string.IsNullOrWhiteSpace(cutoff.Groups[1].Value))
             {
@@ -110,44 +184,38 @@ public static class RegexExpenseParser
             }
 
             candidate = candidate.TrimEnd('.', ',', '-', ' ', ':', '*');
-            if (!string.IsNullOrWhiteSpace(candidate) && candidate.Length >= 2 && !Regex.IsMatch(candidate, @"^\d+$"))
+            if (!string.IsNullOrWhiteSpace(candidate)
+                && candidate.Length >= 2
+                && !InvalidMerchantCandidateRegex.IsMatch(candidate))
             {
                 merchant = candidate;
             }
         }
 
         // Pattern B: Known major app/merchant fallback
-        if (string.IsNullOrWhiteSpace(merchant) || merchant.Equals("cartao", StringComparison.OrdinalIgnoreCase) || merchant.Equals("cartão", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(merchant))
         {
-            if (Regex.IsMatch(input, @"\bifood\b", RegexOptions.IgnoreCase))
-                merchant = "iFood";
-            else if (Regex.IsMatch(input, @"\buber(?:\s*\*trip|\s*eats)?\b", RegexOptions.IgnoreCase))
-                merchant = "Uber";
-            else if (Regex.IsMatch(input, @"\bmercado\s*livre\b", RegexOptions.IgnoreCase))
-                merchant = "Mercado Livre";
-            else if (Regex.IsMatch(input, @"\bamazon(?:\s*prime)?\b", RegexOptions.IgnoreCase))
-                merchant = "Amazon";
-            else if (Regex.IsMatch(input, @"\brappi\b", RegexOptions.IgnoreCase))
-                merchant = "Rappi";
-            else if (Regex.IsMatch(input, @"\b99(?:\s*app|\s*pop|\s*taxi)?\b", RegexOptions.IgnoreCase))
-                merchant = "99";
-            else if (Regex.IsMatch(input, @"\bmcdonald'?s\b", RegexOptions.IgnoreCase))
-                merchant = "McDonald's";
-            else if (Regex.IsMatch(input, @"\bburger\s*king\b", RegexOptions.IgnoreCase))
-                merchant = "Burger King";
-            else if (Regex.IsMatch(input, @"\bspotify\b", RegexOptions.IgnoreCase))
-                merchant = "Spotify";
-            else if (Regex.IsMatch(input, @"\bnetflix\b", RegexOptions.IgnoreCase))
-                merchant = "Netflix";
+            foreach (var (pattern, canonicalName) in KnownAppPatterns)
+            {
+                if (pattern.IsMatch(input))
+                {
+                    merchant = canonicalName;
+                    break;
+                }
+            }
         }
 
         // Pattern C: Explicit store or order label
         if (string.IsNullOrWhiteSpace(merchant))
         {
-            var storeMatch = Regex.Match(input, @"\b(?:estabelecimento|loja|restaurante|fornecedor|vendedor)\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\*\-&]{2,60})", RegexOptions.IgnoreCase);
+            var storeMatch = Regex.Match(input, @"\b(?:estabelecimento|loja|restaurante|fornecedor|vendedor)\s*:?\s*([A-Za-zÀ-ÖØ-öø-ÿ0-9\s\.\*\-&']{2,60})", RegexOptions.IgnoreCase);
             if (storeMatch.Success)
             {
-                merchant = storeMatch.Groups[1].Value.Trim().TrimEnd('.', ',', '-', ' ', ':');
+                var candidate = storeMatch.Groups[1].Value.Trim().TrimEnd('.', ',', '-', ' ', ':');
+                if (!InvalidMerchantCandidateRegex.IsMatch(candidate))
+                {
+                    merchant = candidate;
+                }
             }
         }
 
@@ -171,19 +239,19 @@ public static class RegexExpenseParser
         if (string.IsNullOrWhiteSpace(raw)) return "Compra Cartão";
         var clean = Regex.Replace(raw.Trim(), @"\s+", " ").TrimEnd('.', ',', '-', ' ', ':', '*');
 
-        if (clean.Equals("ifood", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("ifood ", StringComparison.OrdinalIgnoreCase)) return "iFood";
-        if (clean.Equals("uber", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("uber ", StringComparison.OrdinalIgnoreCase)) return "Uber";
-        if (clean.Equals("mercado livre", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("mercado livre ", StringComparison.OrdinalIgnoreCase)) return "Mercado Livre";
-        if (clean.Equals("amazon", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("amazon ", StringComparison.OrdinalIgnoreCase)) return "Amazon";
-        if (clean.Equals("rappi", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("rappi ", StringComparison.OrdinalIgnoreCase)) return "Rappi";
-        if (clean.Equals("mcdonalds", StringComparison.OrdinalIgnoreCase) || clean.Equals("mcdonald's", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("mcdonald", StringComparison.OrdinalIgnoreCase)) return "McDonald's";
-        if (clean.Equals("burger king", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("burger king ", StringComparison.OrdinalIgnoreCase)) return "Burger King";
-        if (clean.Equals("spotify", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("spotify ", StringComparison.OrdinalIgnoreCase)) return "Spotify";
-        if (clean.Equals("netflix", StringComparison.OrdinalIgnoreCase) || clean.StartsWith("netflix ", StringComparison.OrdinalIgnoreCase)) return "Netflix";
+        foreach (var (prefix, canonical) in CanonicalMerchantPrefixes)
+        {
+            if (clean.Equals(prefix, StringComparison.OrdinalIgnoreCase)
+                || clean.StartsWith(prefix + " ", StringComparison.OrdinalIgnoreCase)
+                || clean.StartsWith(prefix + "'", StringComparison.OrdinalIgnoreCase))
+            {
+                return canonical;
+            }
+        }
 
         if (clean.Length > 3 && clean == clean.ToUpperInvariant())
         {
-            return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(clean.ToLowerInvariant());
+            return PtBrCulture.TextInfo.ToTitleCase(clean.ToLowerInvariant());
         }
 
         if (char.IsLower(clean[0]))
@@ -342,16 +410,6 @@ public static class RegexExpenseParser
             }
         }
 
-        // Check if input is a purchase notification or order checkout screen
-        if (IsNotificationOrCheckoutText(input))
-        {
-            var notif = ParseNotificationOrCheckout(input);
-            if (notif != null && notif.Amount > 0)
-            {
-                return notif;
-            }
-        }
-
         var text = input.Trim().ToLowerInvariant();
 
         if (text == "status" || text == "/status" || text.Contains("como ta minha fatura") || text.Contains("como está minha fatura") || text == "resumo")
@@ -364,7 +422,7 @@ public static class RegexExpenseParser
             return new ParsedExpenseIntentModel { Intent = "UNDO" };
         }
 
-        if (text == "paguei a fatura" || text == "fatura paga" || text == "/pagarfatura" || text == "pagar fatura" || text == "quitei a fatura" || text == "quitei o cartao")
+        if (Regex.IsMatch(text, @"^(?:paguei\s+a\s+fatura|fatura\s+paga|/pagarfatura|pagar\s+fatura|quitei\s+a\s+fatura|quitei\s+o\s+cart[ãa]o)(?:\s+(?:de\s+)?(?:r\$\s*)?[0-9]+(?:[\.,][0-9]{1,2})?)?$", RegexOptions.IgnoreCase))
         {
             return new ParsedExpenseIntentModel { Intent = "PAY_INVOICE" };
         }
@@ -451,7 +509,7 @@ public static class RegexExpenseParser
             }
         }
 
-        var simMatch = Regex.Match(text, @"^(?:/|)?simular\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(?:em\s+)?([0-9]{1,2})x?)?", RegexOptions.IgnoreCase);
+        var simMatch = Regex.Match(text, @"^(?:/|)?simula(?:r)?\s+(?:r\$\s*)?([0-9]+(?:[\.,][0-9]{1,2})?)(?:\s+(?:em\s+)?([0-9]{1,2})x?)?", RegexOptions.IgnoreCase);
         if (simMatch.Success)
         {
             var amountStr = simMatch.Groups[1].Value.Replace(',', '.');
@@ -470,6 +528,16 @@ public static class RegexExpenseParser
                     Installments = installments,
                     Description = "Simulação"
                 };
+            }
+        }
+
+        // Check if input is a purchase notification or order checkout screen (after chat commands)
+        if (IsNotificationOrCheckoutText(input))
+        {
+            var notif = ParseNotificationOrCheckout(input);
+            if (notif != null && notif.Amount > 0)
+            {
+                return notif;
             }
         }
 

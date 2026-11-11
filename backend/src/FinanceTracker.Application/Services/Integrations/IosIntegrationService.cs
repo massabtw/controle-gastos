@@ -23,7 +23,7 @@ public class IosIntegrationService : IIosIntegrationService
     private readonly IFinancialEngineService _financialEngineService;
     private readonly IGroqService _groqService;
     private readonly ITelegramService _telegramService;
-    private readonly IConfiguration _configuration;
+    private readonly IConfiguration? _configuration;
     private readonly IValidator<IosShortcutWebhookModel> _validator;
     private readonly ILogger<IosIntegrationService> _logger;
 
@@ -32,7 +32,7 @@ public class IosIntegrationService : IIosIntegrationService
         IFinancialEngineService financialEngineService,
         IGroqService groqService,
         ITelegramService telegramService,
-        IConfiguration configuration,
+        IConfiguration? configuration,
         IValidator<IosShortcutWebhookModel> validator,
         ILogger<IosIntegrationService> logger)
     {
@@ -52,7 +52,7 @@ public class IosIntegrationService : IIosIntegrationService
         ITelegramService telegramService,
         IValidator<IosShortcutWebhookModel> validator,
         ILogger<IosIntegrationService> logger)
-        : this(expenseService, financialEngineService, groqService, telegramService, null!, validator, logger)
+        : this(expenseService, financialEngineService, groqService, telegramService, null, validator, logger)
     {
     }
 
@@ -131,9 +131,19 @@ public class IosIntegrationService : IIosIntegrationService
                 else if (RegexExpenseParser.IsNotificationOrCheckoutText(rawText))
                 {
                     parsed = RegexExpenseParser.ParseNotificationOrCheckout(rawText);
+
+                    // If regex only extracted the generic fallback merchant name, allow Groq LLM to enrich it
+                    if (parsed == null || parsed.Amount <= 0 || parsed.Description == "Compra Cartão")
+                    {
+                        var llmParsed = await _groqService.ParseExpenseIntentAsync(rawText);
+                        if (llmParsed != null && llmParsed.Amount > 0 && !string.IsNullOrWhiteSpace(llmParsed.Description))
+                        {
+                            parsed = llmParsed;
+                        }
+                    }
                 }
 
-                // Priority 2: Use Groq LLM if receipt parser did not extract an amount or if natural text
+                // Priority 2: Use Groq LLM if receipt/notification parser did not extract an amount or if natural text
                 if (parsed == null || parsed.Amount <= 0)
                 {
                     parsed = await _groqService.ParseExpenseIntentAsync(rawText);
@@ -171,13 +181,15 @@ public class IosIntegrationService : IIosIntegrationService
             }
 
             // Smart Payment Method Override:
-            // Even if the iOS Shortcut sends "paymentMethod": "PIX_CAIXINHA", inspect rawText (or merchant if rawText is empty):
-            // If rawText contains card/checkout keywords and does NOT contain Pix transfer keywords, automatically set paymentMethod = "CARD"
+            // When the iOS Back Tap OCR Shortcut sends "paymentMethod": "PIX_CAIXINHA" (or leaves it empty),
+            // inspect rawText (or merchant if rawText is empty) for credit card / checkout patterns.
+            // Never override explicit PIX_INFLOW or PIX_ACCOUNT.
             var textToInspect = !string.IsNullOrWhiteSpace(model.RawText)
                 ? model.RawText
                 : (model.Merchant ?? string.Empty);
 
-            if (RegexExpenseParser.IsCardOrCheckoutText(textToInspect))
+            if ((string.IsNullOrWhiteSpace(paymentMethod) || paymentMethod == "PIX_CAIXINHA")
+                && RegexExpenseParser.IsCardOrCheckoutText(textToInspect))
             {
                 paymentMethod = "CARD";
             }
@@ -191,7 +203,7 @@ public class IosIntegrationService : IIosIntegrationService
             category = SanitizeCategory(category);
 
             // 4. Persist in Neon PostgreSQL & Recalculate Cycle Metrics
-            var deductFromCycleCap = paymentMethod == "CARD" ? true : (model.DeductFromCycleCap ?? true);
+            var deductFromCycleCap = model.DeductFromCycleCap ?? true;
 
             var createExpenseModel = new CreateExpenseModel
             {
