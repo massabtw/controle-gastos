@@ -52,7 +52,7 @@ public class IosIntegrationService : IIosIntegrationService
         ITelegramService telegramService,
         IValidator<IosShortcutWebhookModel> validator,
         ILogger<IosIntegrationService> logger)
-        : this(expenseService, financialEngineService, groqService, telegramService, (IConfiguration?)null, validator, logger)
+        : this(expenseService, financialEngineService, groqService, telegramService, null!, validator, logger)
     {
     }
 
@@ -90,7 +90,11 @@ public class IosIntegrationService : IIosIntegrationService
             DateTime? transactionDate = null;
 
             var isRawTextPayload = !string.IsNullOrWhiteSpace(model.RawText);
-            var isStructuredApplePay = !isRawTextPayload && !string.IsNullOrWhiteSpace(model.Merchant) && parsedAmount.HasValue && parsedAmount.Value > 0;
+            var isStructuredApplePay = !isRawTextPayload
+                && !string.IsNullOrWhiteSpace(model.Merchant)
+                && parsedAmount.HasValue
+                && parsedAmount.Value > 0
+                && !RegexExpenseParser.IsNotificationOrCheckoutText(model.Merchant);
 
             if (isStructuredApplePay)
             {
@@ -123,6 +127,10 @@ public class IosIntegrationService : IIosIntegrationService
                 if (RegexExpenseParser.IsReceiptText(rawText))
                 {
                     parsed = RegexExpenseParser.ParseReceipt(rawText);
+                }
+                else if (RegexExpenseParser.IsNotificationOrCheckoutText(rawText))
+                {
+                    parsed = RegexExpenseParser.ParseNotificationOrCheckout(rawText);
                 }
 
                 // Priority 2: Use Groq LLM if receipt parser did not extract an amount or if natural text
@@ -162,6 +170,18 @@ public class IosIntegrationService : IIosIntegrationService
                 }
             }
 
+            // Smart Payment Method Override:
+            // Even if the iOS Shortcut sends "paymentMethod": "PIX_CAIXINHA", inspect rawText (or merchant if rawText is empty):
+            // If rawText contains card/checkout keywords and does NOT contain Pix transfer keywords, automatically set paymentMethod = "CARD"
+            var textToInspect = !string.IsNullOrWhiteSpace(model.RawText)
+                ? model.RawText
+                : (model.Merchant ?? string.Empty);
+
+            if (RegexExpenseParser.IsCardOrCheckoutText(textToInspect))
+            {
+                paymentMethod = "CARD";
+            }
+
             if (amount <= 0)
             {
                 return Result<IosShortcutResponseModel>.Failure("Não foi possível identificar o valor monetário da transação.", 400);
@@ -171,6 +191,8 @@ public class IosIntegrationService : IIosIntegrationService
             category = SanitizeCategory(category);
 
             // 4. Persist in Neon PostgreSQL & Recalculate Cycle Metrics
+            var deductFromCycleCap = paymentMethod == "CARD" ? true : (model.DeductFromCycleCap ?? true);
+
             var createExpenseModel = new CreateExpenseModel
             {
                 Description = description,
@@ -179,7 +201,7 @@ public class IosIntegrationService : IIosIntegrationService
                 Category = category,
                 Installments = installments,
                 PaymentMethod = paymentMethod,
-                DeductFromCycleCap = model.DeductFromCycleCap ?? true,
+                DeductFromCycleCap = deductFromCycleCap,
                 TransactionDate = transactionDate ?? DateTime.Now
             };
 

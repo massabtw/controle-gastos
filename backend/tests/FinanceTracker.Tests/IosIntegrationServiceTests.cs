@@ -360,4 +360,128 @@ public class IosIntegrationServiceTests
         Assert.Equal(expectedRecipient, result.Description);
         Assert.Equal("PIX_CAIXINHA", result.PaymentMethod);
     }
+
+    [Fact]
+    public async Task ProcessShortcutWebhookAsync_NotificationBanner_ShouldOverrideToCardAndExtractMerchant()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService(); // null fallback to regex
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            RawText = "Compra de R$ 45,90 aprovada em iFood no seu cartão",
+            PaymentMethod = "PIX_CAIXINHA" // Shortcut mistakenly sent PIX_CAIXINHA
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.True(result.IsSuccess, result.Error ?? "Error was null");
+        Assert.NotNull(result.Value);
+        Assert.NotNull(expenseService.LastCreatedModel);
+
+        Assert.Equal("iFood", expenseService.LastCreatedModel.Description);
+        Assert.Equal(45.90m, expenseService.LastCreatedModel.Amount);
+        Assert.Equal("Alimentação", expenseService.LastCreatedModel.Category);
+        Assert.Equal("CARD", expenseService.LastCreatedModel.PaymentMethod);
+        Assert.True(expenseService.LastCreatedModel.DeductFromCycleCap);
+    }
+
+    [Fact]
+    public async Task ProcessShortcutWebhookAsync_InAppCheckoutScreen_ShouldOverrideToCard()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService();
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            RawText = "iFood - Pedido #1234: Total R$ 68,50 pago com Apple Pay",
+            PaymentMethod = "PIX_CAIXINHA"
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.True(result.IsSuccess, result.Error ?? "Error was null");
+        Assert.NotNull(result.Value);
+        Assert.NotNull(expenseService.LastCreatedModel);
+
+        Assert.Equal("iFood", expenseService.LastCreatedModel.Description);
+        Assert.Equal(68.50m, expenseService.LastCreatedModel.Amount);
+        Assert.Equal("CARD", expenseService.LastCreatedModel.PaymentMethod);
+    }
+
+    [Fact]
+    public async Task ProcessShortcutWebhookAsync_NotificationWithInstallments_ShouldExtractInstallmentsAndOverrideToCard()
+    {
+        Environment.SetEnvironmentVariable("APP_PIN", null);
+        var expenseService = new FakeExpenseService();
+        var financialEngine = new FakeFinancialEngineService();
+        var groq = new FakeGroqService();
+        var telegram = new FakeTelegramService();
+        var validator = new IosShortcutWebhookModelValidator();
+
+        var service = new IosIntegrationService(
+            expenseService,
+            financialEngine,
+            groq,
+            telegram,
+            validator,
+            NullLogger<IosIntegrationService>.Instance
+        );
+
+        var request = new IosShortcutWebhookModel
+        {
+            RawText = "Compra de R$ 150,00 em 3x aprovada em Magazine Luiza",
+            PaymentMethod = "PIX_CAIXINHA"
+        };
+
+        var result = await service.ProcessShortcutWebhookAsync(request);
+
+        Assert.True(result.IsSuccess, result.Error ?? "Error was null");
+        Assert.NotNull(expenseService.LastCreatedModel);
+
+        Assert.Equal("Magazine Luiza", expenseService.LastCreatedModel.Description);
+        Assert.Equal(150.00m, expenseService.LastCreatedModel.Amount);
+        Assert.Equal(3, expenseService.LastCreatedModel.Installments);
+        Assert.Equal("Compras", expenseService.LastCreatedModel.Category);
+        Assert.Equal("CARD", expenseService.LastCreatedModel.PaymentMethod);
+    }
+
+    [Theory]
+    [InlineData("Compra aprovada no seu cartão em Uber de R$ 22,40", true)]
+    [InlineData("Compra de R$ 89,90 aprovada em Mercado Livre", true)]
+    [InlineData("Amazon - Pedido finalizado R$ 129,00 em 2x", true)]
+    [InlineData("Pagamento de fatura de cartão R$ 450,00", true)]
+    [InlineData("Comprovante de transferência 09 NOV 2026 Valor R$ 50,00 Tipo de transferência Pix", false)]
+    [InlineData("Pix enviado com sucesso R$ 30,00 para João", false)]
+    public void RegexExpenseParser_IsCardOrCheckoutText_ShouldCorrectlyDifferentiate(string input, bool expected)
+    {
+        var isCard = RegexExpenseParser.IsCardOrCheckoutText(input);
+        Assert.Equal(expected, isCard);
+    }
 }
